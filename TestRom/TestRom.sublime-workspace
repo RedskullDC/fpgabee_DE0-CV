@@ -1,0 +1,1202 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"COLOR_RAM",
+				"COLOR_RAM_BASE"
+			],
+			[
+				"VML_",
+				"VML_ATTRIBUTE_RAM_ENABLE"
+			],
+			[
+				"busines",
+				"businessRegistration"
+			],
+			[
+				"business",
+				"businessRegistrations"
+			],
+			[
+				"reque",
+				"requestBusinessRegistrations"
+			],
+			[
+				"list",
+				"listThumbnail"
+			],
+			[
+				"banner",
+				"bannerImages"
+			],
+			[
+				"bann",
+				"bannerIds"
+			],
+			[
+				"proces",
+				"processReturnDataAndCloseModal"
+			],
+			[
+				"cloudin",
+				"cloudinary_url"
+			],
+			[
+				"clou",
+				"cloudinary_url"
+			],
+			[
+				"CLOU",
+				"CLOUDINARY_SECRET"
+			],
+			[
+				"ret",
+				"retailEntityId"
+			],
+			[
+				"changeS",
+				"changeStyle"
+			],
+			[
+				"flas",
+				"flash_wait_B_n"
+			],
+			[
+				"flash",
+				"flash_dout_B"
+			],
+			[
+				"cpu_",
+				"cpu_wr_n"
+			],
+			[
+				"boot",
+				"boot_range"
+			],
+			[
+				"mem",
+				"mem_rd"
+			],
+			[
+				"reg",
+				"reg_cursor_pos"
+			],
+			[
+				"status",
+				"status_busy"
+			],
+			[
+				"dma",
+				"dma_addr_reg"
+			],
+			[
+				"dma_",
+				"dma_din"
+			],
+			[
+				"sd_op",
+				"sd_op_block_number"
+			],
+			[
+				"Micro",
+				"MicrobeeSwitches"
+			],
+			[
+				"_GS",
+				"_GSFINAL"
+			],
+			[
+				"_casset",
+				"_cassettePosition"
+			],
+			[
+				"Wri",
+				"writeHexByte"
+			],
+			[
+				"cass",
+				"_cassettePosition"
+			],
+			[
+				"Cass",
+				"CassetteCyclesOutPort"
+			],
+			[
+				"Cassett",
+				"CassetteCyclesBusyPort"
+			]
+		]
+	},
+	"buffers":
+	[
+		{
+			"file": "MemTestRom.asm",
+			"settings":
+			{
+				"buffer_size": 3560,
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"file": "makefile",
+			"settings":
+			{
+				"buffer_size": 917,
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"file": "/home/bradr/Projects/ubee512/doc/README",
+			"settings":
+			{
+				"buffer_size": 249134,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "/home/bradr/.ubee512/ubee512rc",
+			"settings":
+			{
+				"buffer_size": 32553,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "CrtcTestRom.lst",
+			"settings":
+			{
+				"buffer_size": 16148,
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"file": "MemTestRom.lst",
+			"settings":
+			{
+				"buffer_size": 14589,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "DiskTestRom.asm",
+			"settings":
+			{
+				"buffer_size": 4640,
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"file": "DiskTestRom.lst",
+			"settings":
+			{
+				"buffer_size": 15959,
+				"line_ending": "Unix"
+			}
+		}
+	],
+	"build_system": "Packages/Makefile/Make.sublime-build",
+	"command_palette":
+	{
+		"height": 54.0,
+		"selected_items":
+		[
+			[
+				"lower",
+				"Convert Case: Lower Case"
+			],
+			[
+				"clean",
+				"Build: Clean"
+			],
+			[
+				"core",
+				"Build: Core Generator"
+			],
+			[
+				"",
+				"Build: Core Generator"
+			],
+			[
+				"upp",
+				"Convert Case: Upper Case"
+			],
+			[
+				"run",
+				"Build: Run"
+			],
+			[
+				"signal",
+				"VHDL: Paste Ports As Signals"
+			],
+			[
+				"ent",
+				"VHDL: Paste Entity Instance"
+			],
+			[
+				"en",
+				"VHDL: Paste Entity Instance"
+			],
+			[
+				"test",
+				"Snippet: TestBench"
+			],
+			[
+				"entity",
+				"VHDL: Paste Entity Instance"
+			],
+			[
+				"vhdl",
+				"VHDL: Paste Entity Instance"
+			],
+			[
+				"Core",
+				"Build: Core Generator"
+			],
+			[
+				"clea",
+				"Build: Clean"
+			],
+			[
+				"bui",
+				"Build: Build"
+			],
+			[
+				"build",
+				"Build: Clean"
+			],
+			[
+				"hex",
+				"Hex Viewer: Toggle Hex View"
+			],
+			[
+				"toggle",
+				"Hex Viewer: Toggle Hex View"
+			],
+			[
+				"install",
+				"Package Control: Install Package"
+			],
+			[
+				"Snippet: Lor",
+				"Snippet: Lorem ipsum"
+			],
+			[
+				"Snippet: ",
+				"Snippet: #!/usr/bin/env"
+			],
+			[
+				"Pack",
+				"Package Control: Install Package"
+			]
+		],
+		"width": 392.0
+	},
+	"console":
+	{
+		"height": 290.0
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"file_history":
+	[
+		"/home/bradr/.ubee512/disks/tmp.ds80.temp",
+		"/home/bradr/portconfusion",
+		"/home/bradr/Projects/fpgabee/TestRom/makefile",
+		"/home/bradr/Projects/fpgabee/TestRom/TestRom.asm",
+		"/home/bradr/Projects/fpgabee/TestRom/TestRom.lst",
+		"/home/bradr/Projects/ubee512/z80debug.c",
+		"/home/bradr/Projects/fpgabee/TestRom/boot.txt",
+		"/home/bradr/.ubee512/roms/S60HDD18.ROM",
+		"/Z/retro/ubee512/doc/README",
+		"/C/retro/meteor/meteor.sublime-workspace",
+		"/C/retro/meteor/makefile",
+		"/C/retro/meteor/meteor.lst",
+		"/Z/retro/meteor2/meteor.yazd.disasm",
+		"/C/retro/meteor/meteor.asm",
+		"/Z/retro/meteor/meteor.sublime-project",
+		"/Z/retro/libs/z80ex-1.1.20rev1/Makefile",
+		"/C/Users/brad/AppData/Roaming/Sublime Text 2/Packages/User/Preferences.sublime-settings",
+		"/Z/retro/meteor/meteor.orig.lst",
+		"/Z/retro/meteor/makefile",
+		"/C/Users/brad/AppData/Roaming/Sublime Text 2/Packages/Makefile/Make.sublime-build",
+		"/Z/retro/meteor2/meteor.disasm",
+		"/Z/retro/meteor/meteor.check.asm",
+		"/Z/retro/meteor/meteor.lst",
+		"/Z/retro/galwork/galaxy.asm",
+		"/Z/retro/meteor/portdoc.md",
+		"/Z/retro/meteor2/meteor.bin",
+		"/Z/retro/meteor2/meteor.hex",
+		"/Z/retro/meteor/meteor.asm",
+		"/Z/retro/meteor/meteor.orig.asm",
+		"/C/Users/brad/Downloads/adventure_world/advenw32.asc",
+		"/C/Users/brad/Downloads/adventure_world/advenw32.mwb",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/js/beam/services/services.js",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/js/beam/controllers/controllers.js",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/finance/offerSales.html",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/css/style.less",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/js/beam/services/routingServices.js",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/admin/businessRegistration.html",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/js/beam/models/models.js",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/offer/offerForm.html",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/retailerGroup/retailerGroupForm.html",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/offer/offerSearch.html",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/store/storeForm.html",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/admin/businessRegistrations.html",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/user/userForm.html",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/terminal/terminalForm.html",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/css/beam.css",
+		"/C/Users/brad/Dropbox/KoreanWar.txt",
+		"/C/Users/brad/Dropbox/Clients/Beam/Account Setup Screen.txt",
+		"/C/Users/brad/Downloads/DansMilfordSoundHike (2).kml",
+		"/C/Users/brad/Downloads/DansMilfordSoundHike (1).kml",
+		"/C/Users/brad/Downloads/DansMilfordSoundHike.kml",
+		"/Z/VSTemplates/CppClass.vstemplate",
+		"/Z/VSTemplates/CppClass.h",
+		"/Z/beam/beam-android/build/build.sh",
+		"/D/VIDEO_TS/VIDEO_TS.IFO",
+		"/Z/beam/business-portal-jsmvc/client/nodeserver/nodeserver.js",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/js/beam/app.js",
+		"/C/Users/brad/AppData/Local/Beam/BeamTerminal.exe_Url_jfve4p5xvy4qezxqxrkdo1o2l4zibo11/1.0.17.0/user.config",
+		"/C/Users/brad/AppData/Local/Beam/BeamTerminal.vshost.exe_Url_hoviw3l0ng5etivw3adetulriy12qokk/1.0.17.0/user.config",
+		"/Z/beam/machine.config",
+		"/C/cygwin/home/brad/dvd-vr-0.9.7/dvd-vr.c",
+		"/Z/test/guilayout/DlgFreeApi.h",
+		"/Z/test/guilayout/guilayout/DlgFree.cpp",
+		"/Z/test/guilayout/guilayout/DlgFree.h",
+		"/Z/test/guilayout/guilayout/DlgFreeApi.h",
+		"/Z/test/guilayout/guilayout/guilayout.cpp",
+		"/Z/test/guilayout/guilayout/guilayout.vxcproj",
+		"/Z/test/guilayout/guilayout/guilayout.vcxproj",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/finance/settlement.html",
+		"/C/Users/brad/AppData/Local/Beam/BeamTerminal.exe_Url_q350yr1b0kxb2x3i4o1qzzneomt4dshf/1.0.17.0/user.config",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/js/beam/utils/Utils.js",
+		"/C/temp/beam offer types",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/image/imageForm.html",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/offer/productForm.html",
+		"/C/Users/bradr/AppData/Roaming/Sublime Text 2/Packages/User/Default (Windows).sublime-keymap",
+		"/Z/dcs/LibVisits/Assets/ar/info/support/aboriginal.html",
+		"/Z/dcs/LibVisits/Assets/ar/info/support/money.html",
+		"/Z/dcs/LibVisits/Assets/ar/info/support/toilet.html",
+		"/Z/dcs/LibVisits/Assets/ar/info/support/other.html",
+		"/Z/dcs/LibVisits/Assets/ar/info/visit/locate.html",
+		"/Z/dcs/LibVisits/Assets/zh/info/support/money.html",
+		"/Z/dcs/LibVisits/Assets/zh/info/visit/medication.html",
+		"/Z/dcs/LibVisits/Assets/zh/info/visit/locate.html",
+		"/Z/dcs/LibVisits/Assets/zh/info/support/aboriginal.html",
+		"/Z/dcs/LibVisits/Assets/zh/info/support/toilet.html",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/images/avatar.gif",
+		"/C/Users/bradr/Documents/Fruit.csv",
+		"/Z/beam/business-portal-jsmvc/makefile",
+		"/Z/beam/business-portal-jsmvc/launch_business_portal.bat",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/retailer/retailerForm.html",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/css/style.css",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/image/imageFormOnOffer.html",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/image/imageForm_.html",
+		"/Z/beam/business-portal-jsmvc/client/src/main/java/com/beampay/portal/servlet/CloudinaryServlet.java",
+		"/Z/beam/business-portal-jsmvc/client/web/nodeserver/nodeserver.js",
+		"/Z/beam/cloudinary/cloudinary_js/test.html",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/js/beam/services/configurationService.js",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/js/beam/config/configurationVariables.js",
+		"/C/Users/bradr/Downloads/download",
+		"/Z/beam/business-portal-jsmvc/client/web/nodeserver/package.json",
+		"/Z/beam/business-portal-jsmvc/client/web/nodeserver.js",
+		"/Z/beam/build-business-portal.bat",
+		"/Z/beam/business-portal-jsmvc/client/src/main/java/com/beampay/portal/servlet/CSVDownloadServlet.java",
+		"/Z/beam/business-portal-jsmvc/client/web/WEB-INF/web.xml",
+		"/Z/beam/business-portal-notes.txt",
+		"/Z/beam/cloudinary/cloudinary_js/js/jquery.fileupload.js",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/index.html",
+		"/Z/beam/business-portal-jsmvc/client/web/secured/index-dev.html",
+		"/Z/beam/business-portal-jsmvc/client/src/main/java/com/beampay/portal/servlet/DelegatingServlet.java",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/js/beam/directives/uiDirectives.js",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/js/angular.js",
+		"/C/Users/bradr/Tools/redeploy-business-portal.bat",
+		"/C/Users/bradr/Tools/redeploy-business-portal",
+		"/Z/beam/start-business-portal-server.bat",
+		"/Z/temp/81639f7857c7d414457d091fec67d27e480e4542.txt",
+		"/Z/temp/81639f7857c7d414457d091fec67d27e480e4542.docx",
+		"/Z/temp/81639f7857c7d414457d091fec67d27e480e4542",
+		"/Z/beam/business-portal-jsmvc/client/web/assets/images/SEEK - Australia's no. 1 jobs, employment, career and recruitment site_files/GlobalScript-JQuery.js",
+		"/Z/imagetest/temp/temp.svg",
+		"/Z/imagetest/output.svg",
+		"/C/Users/bradr/Dropbox/musclecarlane/Falcon.svg",
+		"/C/Users/bradr/Dropbox/musclecarlane/Charger.svg",
+		"/C/Program Files (x86)/Android/android-sdk/tools/android.bat",
+		"/Z/beam/beam-android/viewpageindicator/build.xml",
+		"/Z/beam/beam-android/beam/local.properties",
+		"/C/cygwin/tmp/build/beam-android/beam/local.properties",
+		"/C/cygwin/tmp/build/beam-android/beam/AndroidManifest.xml",
+		"/C/cygwin/tmp/build/beam-android/beam/build.xml"
+	],
+	"find":
+	{
+		"height": 34.0
+	},
+	"find_in_files":
+	{
+		"height": 0.0,
+		"where_history":
+		[
+			"",
+			"Z:\\dcs\\LibVisits\\Assets\\ar\\info",
+			"",
+			"Z:\\beam\\beam-android",
+			"Z:\\dcs\\Visits_Android",
+			"Z:\\dcs\\Escapes_Android",
+			"Z:\\dcs\\v1\\VisitorInfo\\iphone",
+			"Z:\\dcs\\v1\\VisitorInfo\\iphone\\Escapes",
+			"Z:\\dcs\\v1\\VisitorInfo\\iphone\\VisitorInfo",
+			"z:\\beam",
+			"",
+			"C:\\Users\\bradr\\dev\\fpga\\Nexys3\\cpu86bench\\cpu86",
+			"cpu86",
+			"<open folders>"
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+			"16k",
+			"bank t arg",
+			"CHECK2",
+			"bank t ar",
+			"bank",
+			"--db",
+			"IX",
+			"PUSH",
+			"LDIR",
+			"OUT ",
+			"OUT",
+			"--db",
+			"trace",
+			"--rom",
+			"rom1",
+			"meteor",
+			"45ba",
+			"0967h",
+			"keys",
+			"L4C71:",
+			"L4C71",
+			"keylr",
+			"L5DD2",
+			"5dd2",
+			"3820",
+			"3840",
+			"384",
+			"384z0",
+			"(38",
+			"L54AC",
+			"(38",
+			"isKeyDown",
+			"iskeydown",
+			"'r'",
+			"L5D8B",
+			"L5CAE",
+			"L5D8B",
+			"L537D",
+			"L5D8B",
+			"537d",
+			"'r'",
+			"5d8b",
+			"5d8f",
+			"537d",
+			"Enter k",
+			"3804h",
+			"isKeyDown",
+			"L5183",
+			"L54E0",
+			"L....: LD      A,\\(data\\+",
+			"L54E0",
+			"LDIR",
+			"check",
+			"L56d4",
+			"check",
+			"702c",
+			"L528B",
+			"L6E3E",
+			"6e3d",
+			"702f",
+			"L528B",
+			"L5277",
+			"605B",
+			"L522F",
+			"L5FA8",
+			"L522F",
+			"L,(",
+			"h,(",
+			"L490B",
+			"h,(",
+			"L48C4",
+			"H,(",
+			"registers",
+			"DB ",
+			"07h",
+			"605B",
+			"H,(",
+			"iy",
+			"L5FFB",
+			"L61D9",
+			"speed",
+			",0C8h",
+			"C8h",
+			"c8",
+			"'3'",
+			"'0'",
+			"data+offs",
+			"data+offse",
+			"data+offset",
+			"data+0480h",
+			"data+0080h",
+			"L4B69",
+			"data+",
+			"+0881h",
+			"881h",
+			"offs_p1",
+			"+0888h",
+			"+0882h",
+			"888h",
+			"offs_blink",
+			"+0880h",
+			"offs_blink",
+			"+0963h",
+			"L668E",
+			"0963h",
+			"DE,0",
+			"L68BA",
+			"883",
+			"54e0",
+			"data\\+0074",
+			"460f",
+			"HL,\\(data",
+			"\\(data.*\\),HL",
+			"BC,(data+",
+			"DE,(data+",
+			"HL,(data+",
+			"891",
+			"L54E0",
+			"882",
+			"DB +7.h",
+			" 7.h",
+			"data+0882",
+			"data\\+....[^h]",
+			"data+",
+			"882",
+			"883",
+			"L5535",
+			"+882"
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+			"CHECK_Z",
+			"TestRom",
+			"L5DD2_keylr",
+			"data+offs_scrbuf2",
+			"data+offs_scrbuf1",
+			"+offs_num_players",
+			"+offs_p2_score",
+			"+offs_p1_score",
+			"+offs_demo",
+			"+offs_blink",
+			"L4A2C_delay_w_snd",
+			"L4C71_sndout",
+			"data+04h",
+			"meteor",
+			"0000h",
+			"BC,00$1h",
+			"vram",
+			"stacktop",
+			"SP,stacktop",
+			"data+0$1h",
+			"data+00$1h",
+			"data+09$1h",
+			"data+08$1h",
+			"data+05$1h",
+			"data+04$1h",
+			"data+02$1h",
+			"data+01$1h",
+			"data+00$1h",
+			"last",
+			"IMAGE_SELECTED",
+			"UploadNewImageController",
+			"ChooseExistingImageController",
+			"lang=\"ar\"",
+			"/",
+			"\", \"",
+			"\"",
+			"",
+			"Nexys3Demo",
+			"r2",
+			"=>",
+			"cpu",
+			"_prev",
+			"",
+			"cpu",
+			"vram_range",
+			"cpu",
+			"",
+			"clock_en",
+			" then",
+			"if ",
+			"screenTransition2",
+			"screenTransition1",
+			"screenTransition0",
+			"screenTransition",
+			"SOUND",
+			"seg7_addr_display",
+			"-mask:fromalpha"
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"selected": 1,
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": "MemTestRom.asm",
+					"settings":
+					{
+						"buffer_size": 3560,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								2740,
+								2740
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 141.0,
+						"zoom_level": 1.0
+					},
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "makefile",
+					"settings":
+					{
+						"buffer_size": 917,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								442,
+								442
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Makefile/Makefile.tmLanguage"
+						},
+						"translation.x": 318.0,
+						"translation.y": 64.0,
+						"zoom_level": 1.0
+					},
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"file": "/home/bradr/Projects/ubee512/doc/README",
+					"settings":
+					{
+						"buffer_size": 249134,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								171624,
+								171624
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 2060.0,
+						"zoom_level": 1.0
+					},
+					"type": "text"
+				},
+				{
+					"buffer": 3,
+					"file": "/home/bradr/.ubee512/ubee512rc",
+					"settings":
+					{
+						"buffer_size": 32553,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								10652,
+								10652
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"tab_size": 3,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 782.0,
+						"zoom_level": 1.0
+					},
+					"type": "text"
+				},
+				{
+					"buffer": 4,
+					"file": "CrtcTestRom.lst",
+					"settings":
+					{
+						"buffer_size": 16148,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								5569,
+								5569
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 270.0,
+						"zoom_level": 1.0
+					},
+					"type": "text"
+				},
+				{
+					"buffer": 5,
+					"file": "MemTestRom.lst",
+					"settings":
+					{
+						"buffer_size": 14589,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								4817,
+								4817
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 270.0,
+						"zoom_level": 1.0
+					},
+					"type": "text"
+				},
+				{
+					"buffer": 6,
+					"file": "DiskTestRom.asm",
+					"settings":
+					{
+						"buffer_size": 4640,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								1527,
+								1527
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 1611.0,
+						"zoom_level": 1.0
+					},
+					"type": "text"
+				},
+				{
+					"buffer": 7,
+					"file": "DiskTestRom.lst",
+					"settings":
+					{
+						"buffer_size": 15959,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								3602,
+								3602
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 1980.0,
+						"zoom_level": 1.0
+					},
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 0.0
+	},
+	"input":
+	{
+		"height": 31.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.exec":
+	{
+		"height": 159.0
+	},
+	"output.hex_viewer_inspector":
+	{
+		"height": 124.0
+	},
+	"replace":
+	{
+		"height": 62.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"selected_items":
+		[
+			[
+				"make",
+				"makefile"
+			],
+			[
+				"lst",
+				"DiskTestRom.lst"
+			],
+			[
+				"disk",
+				"DiskTestRom.asm"
+			],
+			[
+				"ls",
+				"DiskTestRom.lst"
+			],
+			[
+				"mem",
+				"MemTestRom.lst"
+			],
+			[
+				"common",
+				"CommonDefs.asm"
+			],
+			[
+				"asm",
+				"TestRom.asm"
+			],
+			[
+				"meteor.or",
+				"meteor.orig.lst"
+			],
+			[
+				"met",
+				"meteor/meteor.asm"
+			],
+			[
+				"makef",
+				"meteor/makefile"
+			],
+			[
+				"makefil",
+				"meteor/makefile"
+			],
+			[
+				"meteor.asm",
+				"meteor/meteor.asm"
+			],
+			[
+				"serv",
+				"web/assets/js/beam/services/services.js"
+			],
+			[
+				"control",
+				"web/assets/js/beam/controllers/controllers.js"
+			],
+			[
+				"service",
+				"web/assets/js/beam/services/services.js"
+			],
+			[
+				"controll",
+				"web/assets/js/beam/controllers/controllers.js"
+			],
+			[
+				"busines",
+				"web/secured/admin/businessRegistration.html"
+			],
+			[
+				"style",
+				"web/assets/css/style.less"
+			],
+			[
+				"style.ess",
+				"web/assets/css/style.less"
+			],
+			[
+				"beamcss",
+				"web/assets/css/beam.css"
+			],
+			[
+				"less",
+				"web/assets/css/style.less"
+			],
+			[
+				"termin",
+				"web/secured/terminal/terminalForm.html"
+			],
+			[
+				"userform",
+				"web/secured/user/userForm.html"
+			],
+			[
+				"services",
+				"web/assets/js/beam/services/services.js"
+			],
+			[
+				"routin",
+				"web/assets/js/beam/services/routingServices.js"
+			],
+			[
+				"controllers",
+				"web/assets/js/beam/controllers/controllers.js"
+			],
+			[
+				"controller",
+				"web/assets/js/beam/controllers/controllers.js"
+			],
+			[
+				"retail",
+				"web/secured/retailerGroup/retailerGroupForm.html"
+			],
+			[
+				"offer",
+				"web/secured/finance/offerSales.html"
+			],
+			[
+				"settle",
+				"web/secured/finance/settlement.html"
+			],
+			[
+				"util",
+				"web/assets/js/beam/utils/Utils.js"
+			],
+			[
+				"sett",
+				"web/secured/finance/settlement.html"
+			],
+			[
+				"storeform",
+				"web/secured/store/storeForm.html"
+			],
+			[
+				"prod",
+				"web/secured/offer/productForm.html"
+			],
+			[
+				"offerform",
+				"web/secured/offer/offerForm.html"
+			],
+			[
+				"product",
+				"web/secured/offer/productForm.html"
+			],
+			[
+				"models",
+				"web/assets/js/beam/models/models.js"
+			],
+			[
+				"style.les",
+				"web/assets/css/style.less"
+			],
+			[
+				"store",
+				"web/secured/store/storeForm.html"
+			],
+			[
+				"mod",
+				"web/assets/js/beam/models/models.js"
+			],
+			[
+				"imageform",
+				"web/secured/image/imageForm.html"
+			],
+			[
+				"retailer",
+				"web/secured/retailer/retailerForm.html"
+			],
+			[
+				"storef",
+				"web/secured/store/storeForm.html"
+			],
+			[
+				"beam",
+				"web/assets/css/beam.css"
+			],
+			[
+				"styles",
+				"web/assets/css/style.less"
+			],
+			[
+				"style.css",
+				"web/assets/css/style.css"
+			],
+			[
+				"imagef",
+				"web/secured/image/imageForm.html"
+			],
+			[
+				"select",
+				"web/secured/offer/selectRetailEntity.html"
+			],
+			[
+				"image",
+				"web/secured/image/imageForm.html"
+			],
+			[
+				"config",
+				"web/assets/js/beam/config/configurationVariables.js"
+			],
+			[
+				"configu",
+				"web/assets/js/beam/services/configurationService.js"
+			],
+			[
+				"ucf",
+				"MoxieLiteSoc.ucf"
+			],
+			[
+				"biu",
+				"cpu86/biu_struct.vhd"
+			],
+			[
+				"per",
+				"PeripheralController.vhd"
+			],
+			[
+				"cass",
+				"CassetteSignalGenerator.vhd"
+			],
+			[
+				"perip",
+				"PeripheralController.vhd"
+			],
+			[
+				"crt",
+				"Crtc6545.vhd"
+			],
+			[
+				"makefile",
+				"makefile_utils.bat"
+			],
+			[
+				"mak",
+				"makefile_xilinx"
+			],
+			[
+				"sdcard",
+				"SDCardController.vhd"
+			]
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 500.0,
+		"selected_items":
+		[
+			[
+				"",
+				"/home/bradr/Projects/meteor/meteor.sublime-project"
+			]
+		],
+		"width": 380.0
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 189.0,
+	"status_bar_visible": true
+}

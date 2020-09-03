@@ -1,0 +1,81 @@
+# File test_rom.asm
+0000				org		0 
+0000			 
+0000 31 00 c0			ld		SP,0xC000 
+0003			 
+0003			;	; Setup seed 
+0003			;	ld		A,0xFE 
+0003			;	ld		(r_seed),A 
+0003			; 
+0003			;	ld		C,1 
+0003			; 
+0003			;	ld		HL,0xC000 
+0003			;loop: 
+0003			;	ld		A,C 
+0003			;	xor		0x3 
+0003			;	ld		C,A 
+0003			;	out		(0),A 
+0003			; 
+0003			;	; Generate a random address at (0xC000-0xFFFF) 
+0003			;	call	rand_8 
+0003			;	out		(1),A 
+0003			;	ld		L,A 
+0003			;	call	rand_8 
+0003			;	or		0xC0 
+0003			;	out		(2),A 
+0003			;	ld		H,A 
+0003			; 
+0003			;	xor		L 
+0003			;	ld		(HL),A 
+0003			; 
+0003			;	ld		B,A 
+0003			;	ld		A,(HL) 
+0003			; 
+0003			;	cp		B 
+0003			;	jr		Z,loop 
+0003			; 
+0003			;	; Failed! 
+0003			;	ld		A,4 
+0003			;	out		(0),A 
+0003			; 
+0003			;	jr		$ 
+0003			 
+0003			 
+0003 1e 03			ld		E,0x3 
+0005			loop: 
+0005 7b				ld		A,E 
+0006 d3 00			out		(0),A 
+0008 07				rlca 
+0009 5f				ld		E,A 
+000a cd 12 00			call	delay_loop 
+000d 18 f6			jr		loop 
+000f			 
+000f			delay: 
+000f 01 e0 2e			ld		BC,12000 
+0012			delay_loop: 
+0012 0b				dec		BC 
+0013 78				ld		A,B 
+0014 b1				or		C 
+0015 20 fb			jr		NZ,delay_loop 
+0017 c9				ret 
+0018			 
+0018			; returns pseudo random 8 bit number in A. Only affects A. 
+0018			; (r_seed) is the byte from which the number is generated and MUST be	 
+0018			; initialised to a non zero value or this function will always return 
+0018			; zero. Also r_seed must be in RAM, you can see why...... 
+0018			 
+0018			rand_8: 
+0018 3a 01 80			LD	A,(r_seed)	; get seed 
+001b e6 b8			AND	0xB8		; mask non feedback bits 
+001d 37				SCF			; set carry 
+001e e2 22 00			JP	PO,no_clr	; skip clear if odd 
+0021 3f				CCF			; complement carry (clear it) 
+0022			no_clr: 
+0022 3a 01 80			LD	A,(r_seed)	; get seed back 
+0025 17				RLA			; rotate carry into byte 
+0026 32 01 80			LD	(r_seed),A	; save back for next prn 
+0029 c9				RET			; done 
+002a			 
+002a			r_seed:	EQU		0x8001  	; prng seed byte (must not be zero) 
+# End of file test_rom.asm
+002a

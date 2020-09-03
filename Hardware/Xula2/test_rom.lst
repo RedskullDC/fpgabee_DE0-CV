@@ -1,0 +1,180 @@
+# File ../xula2test/test_rom.asm
+0000			r_seed:		EQU		0xF000  	; prng seed byte (must not be zero) 
+0000			stack_top:	EQU		0xF400 
+0000			 
+0000			 
+0000				org		0 
+0000			 
+0000				; Test write immediately on startup 
+0000 3e a5			ld		A,0xA5 
+0002 32 10 80			ld		(0x8010),A 
+0005 3a 10 80			ld		A,(0x8010) 
+0008 fe a5			cp		0xA5 
+000a 20 10			jr		NZ,fail1 
+000c			 
+000c				; Setup  
+000c 31 00 f4			ld		SP,stack_top 
+000f 3e 01			ld		A,1 
+0011 32 00 f0			ld		(r_seed),A 
+0014			 
+0014 cd 22 00			call	test1 
+0017 cd 41 00			call	test2		; never returns! 
+001a 18 fe			jr		$ 
+001c			 
+001c			fail1: 
+001c 3e f1			ld		A,0xF1; 
+001e d3 a0			out		(0xa0),A 
+0020 18 fe			jr		$ 
+0022			 
+0022			 
+0022			; Simple test fills from 0x4000 -> 0xC000 with AA 
+0022			; Reads it back and tests it's correct 
+0022			test1: 
+0022			 
+0022				; Write 
+0022 21 00 40			ld		HL,0x4000 
+0025 11 01 40			ld		DE,0x4001 
+0028 01 ff 7f			ld		BC,0x7fff 
+002b 36 aa			ld		(HL),0xAA 
+002d ed b0			ldir 
+002f			 
+002f				; Read, check 
+002f 21 00 40			ld		HL,0x4000 
+0032 01 00 80			ld		BC,0x8000 
+0035			read_loop: 
+0035 7e				ld		A,(HL) 
+0036 fe aa			cp		0xAA 
+0038 20 59			jr		NZ,fail2 
+003a 23				inc		HL 
+003b 0b				dec		BC 
+003c 78				ld		A,B 
+003d b1				or		C 
+003e 20 f5			jr		NZ,read_loop 
+0040			 
+0040 c9				ret 
+0041			 
+0041			; More complex test: 
+0041			; Fills from 0x4000 to 0xC000 with initial byte 
+0041			; Main loop HL from 0x4000 to 0x8000 
+0041			;  		Compares (HL) to (HL+0x4000) 
+0041			; 		Write a random byte to (HL) 
+0041			; 		Read it straight back and check it's correct 
+0041			; 		Write same random byte to (HL+0x4000) 
+0041			; 		Read it straight back and check it's correct 
+0041			; 		Delay 
+0041			;		Repeat main loop forever 
+0041			test2: 
+0041				; Init memory 
+0041 21 00 40			ld		HL,0x4000 
+0044 11 01 40			ld		DE,0x4001 
+0047 01 ff 7f			ld		BC,0x7fff 
+004a 36 ba			ld		(HL),0xBA 
+004c ed b0			ldir 
+004e			 
+004e 21 00 40			ld		HL,0x4000 
+0051 01 00 00			ld		BC,0 
+0054			test2_l1: 
+0054			 
+0054 c5				push	BC 
+0055				 
+0055				; Display the address 
+0055 7c				ld		A,H 
+0056 d3 a2			out		(0xa2),A 
+0058 7d				ld		A,L 
+0059 d3 a1			out		(0xa1),A 
+005b			 
+005b				; Compare two bytes 
+005b 11 00 40			ld		DE,0x4000 
+005e 7e				ld		A,(HL)		; Get old byte 
+005f 19				add		HL,DE		; Go to pair address 
+0060 be				cp		(HL)		; Compare 
+0061 20 36			jr		NZ,fail3		; Quit if fail 
+0063			 
+0063			 
+0063				; Get a new random byte 
+0063 cd ab 00			call	rand_8 
+0066			 
+0066				; Write it to lower half 
+0066 b7				or		A 
+0067 ed 52			sbc		HL,DE 
+0069 77				ld		(HL),A	 
+006a 46				ld		B,(HL) 
+006b b8				cp		B 
+006c 20 31			jr		NZ,fail4 
+006e			 
+006e				; Add 0x4000 
+006e 19				add		HL,DE 
+006f			 
+006f				; Display the address 
+006f f5				push	AF 
+0070 7c				ld		A,H 
+0071 d3 a2			out		(0xa2),A 
+0073 7d				ld		A,L 
+0074 d3 a1			out		(0xa1),A 
+0076 f1				pop		AF 
+0077			 
+0077			 
+0077				; Write it to upper half 
+0077 77				ld		(HL),A 
+0078 46				ld		B,(HL)	 
+0079 b8				cp		B 
+007a 20 29			jr		NZ,fail5 
+007c			 
+007c 23				inc		HL 
+007d 7c				ld		A,H 
+007e e6 3f			and		0x3F 
+0080 f6 40			or		0x40 
+0082 67				ld		H,A 
+0083			 
+0083 c1				pop		BC 
+0084 0b				dec		BC 
+0085 78				ld		A,B 
+0086 b1				or		C 
+0087 20 cb			jr		NZ,test2_l1 
+0089			 
+0089				; Delay for a bit 
+0089 01 00 00			ld		BC,0 
+008c			delay_loop: 
+008c 0b				dec		BC 
+008d 78				ld		A,B 
+008e b1				or		C 
+008f 20 fb			jr		NZ,delay_loop 
+0091			 
+0091 18 c1			jr		test2_l1 
+0093			 
+0093			fail2: 
+0093 3e f2			ld		A,0xF2; 
+0095 d3 a0			out		(0xa0),A 
+0097 18 fe			jr		$ 
+0099			 
+0099			fail3: 
+0099 3e f3			ld		A,0xF3 
+009b d3 a0			out		(0xa0),A 
+009d 18 fe			jr		$ 
+009f			 
+009f			fail4: 
+009f 3e f4			ld		A,0xF4 
+00a1 d3 a0			out		(0xa0),A 
+00a3 18 fe			jr		$ 
+00a5			 
+00a5			fail5: 
+00a5 3e f5			ld		A,0xF5 
+00a7 d3 a0			out		(0xa0),A 
+00a9 18 fe			jr		$ 
+00ab			 
+00ab			 
+00ab			rand_8: 
+00ab 3a 00 f0			LD	A,(r_seed)	; get seed 
+00ae e6 b8			AND	0xB8		; mask non feedback bits 
+00b0 37				SCF				; set carry 
+00b1 e2 b5 00			JP	PO,no_clr	; skip clear if odd 
+00b4 3f				CCF				; complement carry (clear it) 
+00b5			no_clr: 
+00b5 3a 00 f0			LD	A,(r_seed)	; get seed back 
+00b8 17				RLA				; rotate carry into byte 
+00b9 32 00 f0			LD	(r_seed),A	; save back for next prn 
+00bc c9				RET				; done 
+00bd			 
+00bd			 
+# End of file ../xula2test/test_rom.asm
+00bd

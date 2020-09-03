@@ -1,0 +1,580 @@
+# File CrtcTestRom.asm
+0000					ORG			08000h 
+8000			 
+8000			RAM_BASE:			EQU		7000h 
+8000			LIB_SCRATCH:		EQU		RAM_BASE 
+8000			Current_Screen:		EQU		RAM_BASE+0x10 
+8000			 
+8000			START: 
+8000 31 00 80			LD		SP,0x8000 
+8003			 
+8003 af				XOR		A 
+8004 32 10 70			LD		(Current_Screen),A 
+8007			 
+8007				; Copy letters to RAM (testing) 
+8007 11 00 30			LD		DE,0x3000 
+800a 21 89 81			LD		HL,LETTERS 
+800d 01 3e 00			LD		BC,LETTERS_END-LETTERS 
+8010 ed b0			LDIR  
+8012			 
+8012 cd 0c 81			CALL	SETUP_PCG_BANKS 
+8015			 
+8015			L_restart: 
+8015				; Setup 64x16 
+8015 3a 10 70			LD		A,(Current_Screen) 
+8018 87				add		a 
+8019 87				add		a 
+801a 87				add		a 
+801b 87				add		a 
+801c 5f				LD		E,A 
+801d 16 00			LD		D,0 
+801f 21 77 82			LD		HL,CRTC_Registers_64_16 
+8022 19				ADD		HL,DE 
+8023 cd 3f 80			CALL	SHOW_TEST_PATTERN 
+8026			 
+8026 cd 80 83			CALL	wait_key 
+8029			 
+8029 3e 80			LD		A,80h 
+802b d3 1c			OUT		(0x1c),A 
+802d			 
+802d cd 80 83			CALL	wait_key 
+8030			 
+8030 3e 00			LD		A,0h 
+8032 d3 1c			OUT		(0x1c),A 
+8034			 
+8034 3a 10 70			LD		A,(Current_Screen) 
+8037 3c				INC		A 
+8038 e6 07			AND		0x07 
+803a 32 10 70			LD		(Current_Screen),A 
+803d			 
+803d 18 d6			JR		L_restart 
+803f			  
+803f			 
+803f			SHOW_TEST_PATTERN: 
+803f				 
+803f e5				PUSH	HL		; Save for later 
+8040 dd e1			POP     IX 
+8042			 
+8042				; Get the line 
+8042 dd 7e 01			LD		A,(IX+1) 
+8045 5f				LD		E,A 
+8046 16 00			LD		D,0 
+8048 d5				PUSH	DE 
+8049			 
+8049 cd 34 83			CALL	setup_crtc 
+804c			 
+804c				; Select colour buffer and fill it with color 
+804c 3e 40			LD		A, COLOR_RAM_ENABLE 
+804e d3 08			OUT     (PORT_COLOR_RAM),A 
+8050 21 00 f8			LD		HL,COLOR_RAM_BASE 
+8053 11 01 f8			LD		DE,COLOR_RAM_BASE+1 
+8056 01 ff 07			LD		BC,0x800-1 
+8059 36 0d			LD		(HL),COLOR_MAGENTA 
+805b ed b0			LDIR 
+805d 3e 00			LD		A,COLOR_RAM_DISABLE 
+805f d3 08			OUT		(PORT_COLOR_RAM),A 
+8061			 
+8061				; Clear the screen 
+8061 3e 20			LD		A,' ' 
+8063 21 00 f0			LD		HL,CHAR_RAM_BASE 
+8066 11 01 f0			LD		DE,CHAR_RAM_BASE+1 
+8069 01 ff 07			LD		BC,0x800-1 
+806c 77				LD      (HL),A 
+806d ed b0			LDIR 
+806f			 
+806f				; Clear attribute RAM 
+806f 3e 10			LD		A,VML_ATTRIBUTE_RAM_ENABLE 
+8071 d3 1c			OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+8073 3e 00			LD		A,0 
+8075 21 00 f0			LD		HL,ATTR_RAM_BASE 
+8078 11 01 f0			LD		DE,ATTR_RAM_BASE+1 
+807b 01 ff 07			LD		BC,0x800-1 
+807e 77				LD      (HL),A 
+807f ed b0			LDIR 
+8081 3e 00			LD		A,VML_CHARACTER_RAM_ENABLE 
+8083 d3 1c			OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+8085				 
+8085				; Program a PCG block 
+8085 21 c7 81			LD		HL,CHAR 
+8088 11 00 f8			LD		DE,PCG_RAM_BASE 
+808b 01 10 00			LD		BC,16 
+808e ed b0			LDIR 
+8090			 
+8090				; Select color ram again 
+8090 3e 40			LD		A, COLOR_RAM_ENABLE 
+8092 d3 08			OUT     (PORT_COLOR_RAM),A 
+8094			 
+8094				; Row 0 = foreground color 
+8094 3e f0			LD		A,0F0h 
+8096 06 10			LD		B,16 
+8098 21 00 f8			LD		HL,COLOR_RAM_BASE 
+809b			L2: 
+809b 77				LD		(HL),A 
+809c 23				INC		HL 
+809d 3c				INC		A 
+809e 10 fb			DJNZ	L2 
+80a0			 
+80a0				; Row 1 = background color 
+80a0 3e 00			LD		A,00h 
+80a2 06 10			LD		B,16 
+80a4 d1				POP		DE 
+80a5 d5				PUSH	DE 
+80a6 21 00 f8			LD		HL,COLOR_RAM_BASE 
+80a9 19				ADD		HL,DE 
+80aa			L3: 
+80aa 77				LD		(HL),A 
+80ab 23				INC		HL 
+80ac c6 10			ADD		A,10h 
+80ae 10 fa			DJNZ	L3 
+80b0			 
+80b0				; Setup 16 x blocks 
+80b0 21 00 f0			LD		HL,CHAR_RAM_BASE 
+80b3 11 01 f0			LD		DE,CHAR_RAM_BASE+1 
+80b6 01 1f 00			LD		BC,31 
+80b9 36 80			LD		(HL),128 
+80bb ed b0			LDIR 
+80bd			 
+80bd			 
+80bd 3e 10			LD		A,VML_ATTRIBUTE_RAM_ENABLE 
+80bf d3 1c			OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+80c1			 
+80c1 06 20			LD		B,32 
+80c3 11 10 f0			LD		DE,CHAR_RAM_BASE+16 
+80c6 3e 00			LD		A,0 
+80c8 12			L4:	LD		(DE),A 
+80c9 13				INC		DE 
+80ca 3c				INC		A 
+80cb 10 fb			DJNZ	L4 
+80cd			 
+80cd 3e 00			LD		A,VML_CHARACTER_RAM_ENABLE 
+80cf d3 1c			OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+80d1			 
+80d1			 
+80d1			 
+80d1				;Show Alphanumerics 
+80d1 d1				POP		DE 
+80d2 d5				PUSH	DE 
+80d3 21 00 f0			LD		HL,CHAR_RAM_BASE  
+80d6 19				ADD		HL,DE 
+80d7 19				ADD		HL,DE 
+80d8 e5				PUSH	HL 
+80d9 d1				POP		DE 
+80da 21 89 81			LD		HL,LETTERS 
+80dd 01 3e 00			LD		BC,LETTERS_END-LETTERS 
+80e0 ed b0			LDIR  
+80e2			 
+80e2 d1				POP		DE 
+80e3 d5				PUSH	DE 
+80e4 21 00 f0			LD		HL,CHAR_RAM_BASE 
+80e7 19				ADD		HL,DE 
+80e8 19				ADD		HL,DE 
+80e9 19				ADD		HL,DE 
+80ea 19				ADD		HL,DE 
+80eb e5				PUSH	HL 
+80ec d1				POP		DE 
+80ed			 
+80ed dd 6e 01			LD		L,(IX+1) 
+80f0 26 00			LD		H,0 
+80f2 cd 8f 83			CALL	prt_int_word 
+80f5			 
+80f5 13				INC		DE 
+80f6 13				INC		DE 
+80f7 dd 6e 06			LD		L,(IX+6) 
+80fa 26 00			LD		H,0 
+80fc cd 8f 83			CALL	prt_int_word 
+80ff			 
+80ff 13				INC		DE 
+8100 13				INC		DE 
+8101 dd 6e 09			LD		L,(IX+9) 
+8104 2c				INC		L 
+8105 26 00			LD		H,0 
+8107 cd 8f 83			CALL	prt_int_word 
+810a			 
+810a			 
+810a			 
+810a d1				POP		DE 
+810b c9				RET 
+810c			 
+810c			SETUP_PCG_BANKS: 
+810c 3e 80			LD		A,0x80 
+810e d3 1c			OUT		(0x1C),A 
+8110 21 67 82			LD		HL,CHAR_0 
+8113 11 00 f8			LD		DE,0xF800 
+8116 01 10 00			LD		BC,16 
+8119 ed b0			LDIR 
+811b			 
+811b 3e 81			LD		A,0x81 
+811d d3 1c			OUT		(0x1C),A 
+811f 21 d7 81			LD		HL,CHAR_1 
+8122 11 00 f8			LD		DE,0xF800 
+8125 01 10 00			LD		BC,16 
+8128 ed b0			LDIR 
+812a			 
+812a 3e 82			LD		A,0x82 
+812c d3 1c			OUT		(0x1C),A 
+812e 21 e7 81			LD		HL,CHAR_2 
+8131 11 00 f8			LD		DE,0xF800 
+8134 01 10 00			LD		BC,16 
+8137 ed b0			LDIR 
+8139			 
+8139 3e 83			LD		A,0x83 
+813b d3 1c			OUT		(0x1C),A 
+813d 21 f7 81			LD		HL,CHAR_3 
+8140 11 00 f8			LD		DE,0xF800 
+8143 01 10 00			LD		BC,16 
+8146 ed b0			LDIR 
+8148			 
+8148 3e 84			LD		A,0x84 
+814a d3 1c			OUT		(0x1C),A 
+814c 21 07 82			LD		HL,CHAR_4 
+814f 11 00 f8			LD		DE,0xF800 
+8152 01 10 00			LD		BC,16 
+8155 ed b0			LDIR 
+8157			 
+8157 3e 85			LD		A,0x85 
+8159 d3 1c			OUT		(0x1C),A 
+815b 21 17 82			LD		HL,CHAR_5 
+815e 11 00 f8			LD		DE,0xF800 
+8161 01 10 00			LD		BC,16 
+8164 ed b0			LDIR 
+8166			 
+8166 3e 86			LD		A,0x86 
+8168 d3 1c			OUT		(0x1C),A 
+816a 21 27 82			LD		HL,CHAR_6 
+816d 11 00 f8			LD		DE,0xF800 
+8170 01 10 00			LD		BC,16 
+8173 ed b0			LDIR 
+8175			 
+8175 3e 87			LD		A,0x87 
+8177 d3 1c			OUT		(0x1C),A 
+8179 21 37 82			LD		HL,CHAR_7 
+817c 11 00 f8			LD		DE,0xF800 
+817f 01 10 00			LD		BC,16 
+8182 ed b0			LDIR 
+8184			 
+8184 3e 00			LD		A,0 
+8186 d3 1c			OUT		(0x1c),A 
+8188			 
+8188 c9				RET 
+8189			 
+8189			 
+8189			 
+8189			LETTERS: 
+8189 ..				DB	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" 
+81c7			LETTERS_END: 
+81c7			 
+81c7			; A PCG Character Block 
+81c7			CHAR: 
+81c7 00 00 00 00 7e 7e 7e 7e		DB	0x00,0x00,0x00,0x00,0x7e,0x7e,0x7e,0x7e 
+81cf 7e 7e 7e 7e 00 00 00 00		DB  0x7e,0x7e,0x7e,0x7e,0x00,0x00,0x00,0x00 
+81d7			 
+81d7			; Another PCG Character Block 
+81d7			CHAR_1: 
+81d7 04 04 04 04 04 00 00 00		DB	0x04,0x04,0x04,0x04,0x04,0x00,0x00,0x00 
+81df 00 00 00 00 00 00 00 00		DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 
+81e7			 
+81e7			CHAR_2: 
+81e7 3c 04 3c 20 3c 00 00 00		DB	0x03c,0x04,0x3c,0x20,0x3c,0x00,0x00,0x00 
+81ef 00 00 00 00 00 00 00 00		DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 
+81f7			 
+81f7			CHAR_3: 
+81f7 3c 04 3c 04 3c 00 00 00		DB	0x03c,0x04,0x3c,0x04,0x3c,0x00,0x00,0x00 
+81ff 00 00 00 00 00 00 00 00		DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 
+8207			 
+8207			CHAR_4: 
+8207 24 24 3c 04 04 00 00 00		DB	0x24,0x24,0x3c,0x04,0x04,0x00,0x00,0x00 
+820f 00 00 00 00 00 00 00 00		DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 
+8217			 
+8217			CHAR_5: 
+8217 3c 20 3c 04 3c 00 00 00		DB	0x3c,0x20,0x3c,0x04,0x3c,0x00,0x00,0x00 
+821f 00 00 00 00 00 00 00 00		DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 
+8227			 
+8227			CHAR_6: 
+8227 3c 20 3c 24 3c 00 00 00		DB	0x3c,0x20,0x3c,0x24,0x3c,0x00,0x00,0x00 
+822f 00 00 00 00 00 00 00 00		DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 
+8237			 
+8237			CHAR_7: 
+8237 3c 04 04 04 04 00 00 00		DB	0x3c,0x04,0x04,0x04,0x04,0x00,0x00,0x00 
+823f 00 00 00 00 00 00 00 00		DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 
+8247			 
+8247			CHAR_8: 
+8247 3c 24 3c 24 3c 00 00 00		DB	0x3c,0x24,0x3c,0x24,0x3c,0x00,0x00,0x00 
+824f 00 00 00 00 00 00 00 00		DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 
+8257			 
+8257			CHAR_9: 
+8257 3c 24 3c 04 3c 00 00 00		DB	0x3c,0x24,0x3c,0x04,0x3c,0x00,0x00,0x00 
+825f 00 00 00 00 00 00 00 00		DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 
+8267			 
+8267			CHAR_0: 
+8267 3c 24 24 24 3c 00 00 00		DB	0x3c,0x24,0x24,0x24,0x3c,0x00,0x00,0x00 
+826f 00 00 00 00 00 00 00 00		DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 
+8277			 
+8277			 
+8277			include "CommonDefs.asm" 
+8277			COLOR_RAM_BASE:		EQU	0xF800 
+8277			PCG_RAM_BASE:		EQU 0xF800 
+8277			CHAR_RAM_BASE:		EQU 0xF000 
+8277			ATTR_RAM_BASE:		EQU 0F000h 
+8277			 
+8277			COLOR_BLACK:		EQU 0 
+8277			COLOR_DARK_RED:     EQU 1 
+8277			COLOR_DARK_GREEN:   EQU 2 
+8277			COLOR_BROWN:        EQU 3 
+8277			COLOR_DARK_BLUE:    EQU 4 
+8277			COLOR_DARK_MAGENTA: EQU 5 
+8277			COLOR_DARK_CYAN:    EQU 6 
+8277			COLOR_LIGHT_GREY:   EQU 7 
+8277			COLOR_DARK_GREY:    EQU 8 
+8277			COLOR_RED:          EQU 9 
+8277			COLOR_GREEN:        EQU 10 
+8277			COLOR_YELLOW:       EQU 11 
+8277			COLOR_BLUE:         EQU 12 
+8277			COLOR_MAGENTA:      EQU 13 
+8277			COLOR_CYAN:         EQU 14 
+8277			COLOR_WHITE:        EQU 15 
+8277			 
+8277			; Color RAM support 
+8277			PORT_COLOR_RAM:				EQU 08h 
+8277			COLOR_RAM_DISABLE:			EQU 00h 
+8277			COLOR_RAM_ENABLE:			EQU 40h 
+8277			 
+8277			; Video Memory Latch 
+8277			PORT_VIDEO_MEMORY_LATCH:	EQU	1Ch 
+8277			VML_BANK_SELECT_MASK:		EQU 0Fh 
+8277			VML_CHARACTER_RAM_ENABLE:	EQU 00h 
+8277			VML_ATTRIBUTE_RAM_ENABLE:	EQU 10h 
+8277			VML_EXTENDED_GRAPHICS:		EQU 80h 
+8277			 
+8277			; Attributes 
+8277			ATTR_PCG_BANK_SELECT_MASK:	EQU 0Fh 
+8277			 
+8277			KEY_LEFT:     EQU 59 
+8277			KEY_RIGHT:    EQU 62 
+8277			KEY_COMMA:    EQU 44 
+8277			KEY_PERIOD:   EQU 46 
+8277			KEY_SPACE:    EQU 55 
+8277			KEY_ENTER:    EQU 52 
+8277			KEY_1:        EQU 33 
+8277			KEY_2:        EQU 34 
+8277			KEY_ESCAPE:   EQU 48 
+8277			 
+8277			 
+8277			; Various CRTC configurations 
+8277			 
+8277			CRTC_Registers_64_16:   
+8277 6b 40 51 37 12 09 10 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x10,0x12 
+827f 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+8287			 
+8287			CRTC_Registers_64_16_b:   
+8287 6b 40 51 37 12 09 10 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x10,0x12 
+828f 48 0a 2f 0f 20 00 00 00		DB  0x48,0x0A,0x2F,0x0F,0x20,0x00,0x00,0x00 
+8297			 
+8297			CRTC_Registers_64_17:   
+8297 6b 40 51 37 12 09 11 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x11,0x12 
+829f 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+82a7			 
+82a7			CRTC_Registers_64_18:   
+82a7 6b 40 51 37 12 09 12 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x12,0x12 
+82af 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+82b7			 
+82b7			CRTC_Registers_40_25: 
+82b7 35 28 2d 24 1b 05 19 1a		DB	0x35,0x28,0x2D,0x24,0x1B,0x05,0x19,0x1A 
+82bf 48 0a 2a 0a 00 00 00 00		DB  0x48,0x0A,0x2A,0x0A,0x00,0x00,0x00,0x00 
+82c7			 
+82c7			CRTC_Registers_80_16: 
+82c7 6b 50 59 37 12 09 10 12		DB	0x6B,0x50,0x59,0x37,0x12,0x09,0x10,0x12 
+82cf 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+82d7			 
+82d7			CRTC_Registers_80_24: 
+82d7 6b 50 58 37 1b 05 18 1a		DB	0x6B,0x50,0x58,0x37,0x1B,0x05,0x18,0x1A 
+82df 48 0a 2a 0a 20 00 00 00		DB  0x48,0x0A,0x2A,0x0A,0x20,0x00,0x00,0x00 
+82e7			 
+82e7			CRTC_Registers_80_25: 
+82e7 6b 50 58 37 1b 05 19 1a		DB	0x6B,0x50,0x58,0x37,0x1B,0x05,0x19,0x1A 
+82ef 48 0a 09 0a 20 00 00 00		DB  0x48,0x0A,0x09,0x0A,0x20,0x00,0x00,0x00 
+82f7			 
+82f7			 
+82f7			; Clear the screen 
+82f7			clear_screen: 
+82f7 3e 20				LD		A,' ' 
+82f9 21 00 f0				LD		HL,CHAR_RAM_BASE 
+82fc 11 01 f0				LD		DE,CHAR_RAM_BASE+1 
+82ff 01 ff 07				LD		BC,0x800-1 
+8302 77					LD      (HL),A 
+8303 ed b0				LDIR 
+8305 c9					RET 
+8306			 
+8306			; Clear attribute RAM 
+8306			clear_attribute_buffer: 
+8306 3e 10				LD		A,VML_ATTRIBUTE_RAM_ENABLE 
+8308 d3 1c				OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+830a 3e 00				LD		A,0 
+830c 21 00 f0				LD		HL,ATTR_RAM_BASE 
+830f 11 01 f0				LD		DE,ATTR_RAM_BASE+1 
+8312 01 ff 07				LD		BC,0x800-1 
+8315 77					LD      (HL),A 
+8316 ed b0				LDIR 
+8318 3e 00				LD		A,VML_CHARACTER_RAM_ENABLE 
+831a d3 1c				OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+831c c9					RET 
+831d			 
+831d			; Fill colour buffer with A 
+831d			clear_color_buffer:	 
+831d f5					PUSH	AF 
+831e 3e 40				LD		A, COLOR_RAM_ENABLE 
+8320 d3 08				OUT     (PORT_COLOR_RAM),A 
+8322 21 00 f8				LD		HL,COLOR_RAM_BASE 
+8325 11 01 f8				LD		DE,COLOR_RAM_BASE+1 
+8328 01 ff 07				LD		BC,0x800-1 
+832b f1					POP		AF 
+832c 77					LD		(HL),A 
+832d ed b0				LDIR 
+832f 3e 00				LD		A,COLOR_RAM_DISABLE 
+8331 d3 08				OUT		(PORT_COLOR_RAM),A 
+8333 c9					RET 
+8334			 
+8334			; Helper to load CRTC with register values pointed to by HL 
+8334			setup_crtc: 
+8334 0e 00				LD		C,0 
+8336 06 10				LD		B,16 
+8338			L1: 
+8338 79					LD		A,C 
+8339 d3 0c				OUT		(0CH),A 
+833b 7e					LD		A,(HL) 
+833c d3 0d				OUT		(0DH),A 
+833e 0c					INC		C 
+833f 23					INC		HL 
+8340 10 f6				DJNZ	L1 
+8342 c9					RET 
+8343			 
+8343			is_key_down:   
+8343 c5					PUSH    BC 
+8344 4f					LD      C,A 
+8345 47					LD      B,A 
+8346 3e 12				LD      A,12h 
+8348 d3 0c				OUT     (0Ch),A 
+834a 78					LD      A,B 
+834b 0f					RRCA 
+834c 0f					RRCA 
+834d 0f					RRCA 
+834e 0f					RRCA 
+834f e6 03				AND     03h 
+8351 d3 0d				OUT     (0Dh),A 
+8353 3e 13				LD      A,13h 
+8355 d3 0c				OUT     (0Ch),A 
+8357 78					LD      A,B 
+8358 07					RLCA 
+8359 07					RLCA 
+835a 07					RLCA 
+835b 07					RLCA 
+835c d3 0d				OUT     (0Dh),A 
+835e 3e 01				LD      A,01h 
+8360 d3 0b				OUT     (0Bh),A 
+8362 3e 10				LD      A,10h 
+8364 d3 0c				OUT     (0Ch),A 
+8366 db 0d				IN      A,(0Dh) 
+8368 3e 1f				LD      A,1Fh 
+836a d3 0c				OUT     (0Ch),A 
+836c d3 0d				OUT     (0Dh),A 
+836e db 0c		L095D: 	IN      A,(0Ch) 
+8370 cb 7f				BIT     7,A 
+8372 28 fa				JR      Z,L095D 
+8374 db 0c				IN      A,(0Ch) 
+8376 2f					CPL 
+8377 cb 77				BIT     6,A 
+8379 3e 00				LD      A,00h 
+837b d3 0b				OUT     (0Bh),A 
+837d 79					LD      A,C 
+837e c1					POP     BC 
+837f c9					RET 
+8380			 
+8380			 
+8380			;; Wait for space key 
+8380			wait_key: 
+8380 3e 37			LD		A,KEY_SPACE 
+8382 cd 43 83			CALL	is_key_down 
+8385 20 f9			JR		NZ,wait_key 
+8387			 
+8387			L_wait2: 
+8387 3e 37			LD		A,KEY_SPACE 
+8389 cd 43 83			CALL	is_key_down 
+838c 28 f9			JR		Z,L_wait2 
+838e c9				RET 
+838f			 
+838f			 
+838f					; print integer in HL to DE 
+838f			prt_int_word: 
+838f 3e 30				LD		A,'0' 
+8391 32 00 70				LD		(LIB_SCRATCH+0),A 
+8394 01 f0 d8				ld		bc,-10000 
+8397 cd b0 83				call	Num1 
+839a 01 18 fc				ld		bc,-1000 
+839d cd b0 83				call	Num1 
+83a0 01 9c ff				ld		bc,-100 
+83a3 cd b0 83				call	Num1 
+83a6 0e f6				ld		c,-10 
+83a8 cd b0 83				call	Num1 
+83ab 48					ld		c,b 
+83ac af					XOR		A 
+83ad 32 00 70				LD		(LIB_SCRATCH+0),A 
+83b0			 
+83b0			Num1:		 
+83b0 3e 2f				ld		a,'0'-1 
+83b2			Num2:	 
+83b2 3c					inc		a 
+83b3 09					add		hl,bc 
+83b4 38 fc				jr		c,Num2 
+83b6 ed 42				sbc		hl,bc 
+83b8			 
+83b8 4f					LD		C,A 
+83b9 3a 00 70				LD		A,(LIB_SCRATCH+0) 
+83bc b9					cp		C 
+83bd c8					ret		Z 
+83be 79					LD		A,C 
+83bf			 
+83bf 12					ld		(de),A 
+83c0 13					inc		de 
+83c1 af					XOR		A 
+83c2 32 00 70				LD		(LIB_SCRATCH+0),A 
+83c5 c9					ret 
+83c6			 
+83c6					; print hex word in HL to DE 
+83c6			prt_hex_word: 
+83c6 7c					LD		A,H 
+83c7 cd cf 83				CALL	prt_hex_byte 
+83ca 7d					LD		A,L 
+83cb cd cf 83				CALL	prt_hex_byte 
+83ce c9					ret 
+83cf			 
+83cf					; print hex byte in A to DE 
+83cf			prt_hex_byte: 
+83cf f5					PUSH	AF 
+83d0 cb 3f				SRL		A 
+83d2 cb 3f				SRL		A 
+83d4 cb 3f				SRL		A 
+83d6 cb 3f				SRL		A 
+83d8 cd dc 83				CALL	prt_hex_nib 
+83db f1					POP		AF 
+83dc					;; fall through 
+83dc			 
+83dc			 
+83dc					; print low nibble of A to DE 
+83dc			prt_hex_nib: 
+83dc e6 0f				and     0xF 
+83de fe 0a				cp      0xA 
+83e0 38 05				jr      c,lt10 
+83e2 c6 37				add		'A' - 0xA; 
+83e4 12					ld		(de),a 
+83e5 13					inc		de 
+83e6 c9					ret 
+83e7			lt10: 
+83e7 c6 30				add		'0' 
+83e9 12					ld		(de),a 
+83ea 13					inc		de 
+83eb c9					ret; 
+83ec			 
+83ec			 
+# End of file CommonDefs.asm
+83ec			 
+# End of file CrtcTestRom.asm
+83ec

@@ -1,0 +1,410 @@
+# File FTest.asm
+0000					ORG			0100h 
+0100			 
+0100			RAM_BASE:			EQU		4000h 
+0100			LIB_SCRATCH:		EQU		RAM_BASE + 20h 
+0100			 
+0100			START: 
+0100 31 00 80			LD		SP,0x8000 
+0103			 
+0103 21 d0 03			LD		HL,CRTC_Registers_64_16 
+0106 cd 8d 04			CALL	setup_crtc 
+0109			 
+0109 cd 50 04			CALL	clear_screen 
+010c 3e 0b			LD		A,COLOR_YELLOW 
+010e cd 76 04			CALL	clear_color_buffer 
+0111 cd 5f 04			CALL	clear_attribute_buffer 
+0114			 
+0114				; Copy letters to RAM (testing) 
+0114 11 00 f0			LD		DE,CHAR_RAM_BASE 
+0117 21 2d 01			LD		HL,MSG 
+011a 01 1e 00			LD		BC,MSG_END-MSG 
+011d ed b0			LDIR 
+011f			 
+011f cd 4b 03			call 	FTEST  
+0122			 
+0122 18 fe			jr		$ 
+0124			 
+0124			 
+0124			hexdump: 
+0124 7e			    LD      A,(HL) 
+0125 cd 28 05		    CALL    prt_hex_byte 
+0128 23			    INC     HL 
+0129 13			    INC     DE 
+012a 10 f8		    DJNZ    hexdump 
+012c c9			    RET 
+012d			 
+012d			 
+012d			MSG: 
+012d ..				DB	"Disk Controller Format Testing" 
+014b			MSG_END: 
+014b			 
+014b 00...		SECTOR_BUFFER:	defs		512 
+034b			 
+034b			FTEST: 
+034b				; Setup sector buffer 
+034b 21 4b 01			ld		HL,SECTOR_BUFFER 
+034e 11 4c 01			ld		DE,SECTOR_BUFFER+1 
+0351 01 ff 01			ld		BC,511 
+0354 ed b0			ldir 
+0356			 
+0356 3e 02			ld		A,2 
+0358 32 4c 01			ld		(SECTOR_BUFFER+1),A 
+035b 3e 04			ld		A,4 
+035d 32 4e 01			ld		(SECTOR_BUFFER+3),A 
+0360 3e 06			ld		A,6 
+0362 32 50 01			ld		(SECTOR_BUFFER+5),A 
+0365			 
+0365				; 3 Sectors	 
+0365 3e 03			ld		A,3 
+0367 d3 42			out		(0x42),A 
+0369			 
+0369				; Track 3 
+0369 3e 03			ld		A,3 
+036b d3 44			out		(0x44),A 
+036d 3e 00			ld		A,0 
+036f d3 45			out		(0x45),A 
+0371			 
+0371				; SDH 
+0371 3e b8			ld		A,10111000b		; floppy 0 head 0 
+0373 d3 46			out		(0x46),A 
+0375 3e 00			ld		A,0 
+0377 d3 48			out		(0x48),A 
+0379			 
+0379				; Invoke command 
+0379 3e 50			ld		A,0x50 
+037b d3 47			out		(0x47),A 
+037d			 
+037d				; Write the buffer 
+037d 21 4b 01			ld		HL,SECTOR_BUFFER 
+0380 01 40 00			ld		BC,0x0040 
+0383 ed b3			otir 
+0385 ed b3			otir 
+0387			 
+0387				; Wait 
+0387			ftest_wait_loop: 
+0387 db 47			in		A,(0x47) 
+0389 e6 80			and		80h 
+038b 20 fa			jr		NZ,ftest_wait_loop 
+038d			 
+038d			 
+038d			 
+038d				; --------- second time with 48 set to 1 
+038d			 
+038d				; Setup sector buffer 
+038d 21 4b 01			ld		HL,SECTOR_BUFFER 
+0390 11 4c 01			ld		DE,SECTOR_BUFFER+1 
+0393 01 ff 01			ld		BC,511 
+0396 ed b0			ldir 
+0398			 
+0398 3e 02			ld		A,2 
+039a 32 4c 01			ld		(SECTOR_BUFFER+1),A 
+039d 3e 04			ld		A,4 
+039f 32 4e 01			ld		(SECTOR_BUFFER+3),A 
+03a2 3e 06			ld		A,6 
+03a4 32 50 01			ld		(SECTOR_BUFFER+5),A 
+03a7			 
+03a7				; 3 Sectors	 
+03a7 3e 03			ld		A,3 
+03a9 d3 42			out		(0x42),A 
+03ab			 
+03ab				; Track 3 
+03ab 3e 06			ld		A,6 
+03ad d3 44			out		(0x44),A 
+03af 3e 00			ld		A,0 
+03b1 d3 45			out		(0x45),A 
+03b3			 
+03b3				; SDH 
+03b3 3e b8			ld		A,10111000b		; floppy 0 head 1 
+03b5 d3 46			out		(0x46),A 
+03b7 3e 01			ld		A,1 
+03b9 d3 48			out		(0x48),A 
+03bb			 
+03bb				; Invoke command 
+03bb 3e 50			ld		A,0x50 
+03bd d3 47			out		(0x47),A 
+03bf			 
+03bf				; Write the buffer 
+03bf 21 4b 01			ld		HL,SECTOR_BUFFER 
+03c2 01 40 00			ld		BC,0x0040 
+03c5 ed b3			otir 
+03c7 ed b3			otir 
+03c9			 
+03c9				; Wait 
+03c9			ftest_wait_loop_2: 
+03c9 db 47			in		A,(0x47) 
+03cb e6 80			and		80h 
+03cd 20 fa			jr		NZ,ftest_wait_loop_2 
+03cf			 
+03cf c9				ret 
+03d0			FTEST_END: 
+03d0			 
+03d0			 
+03d0			include "CommonDefs.asm" 
+03d0			COLOR_RAM_BASE:		EQU	0xF800 
+03d0			PCG_RAM_BASE:		EQU 0xF800 
+03d0			CHAR_RAM_BASE:		EQU 0xF000 
+03d0			ATTR_RAM_BASE:		EQU 0F000h 
+03d0			 
+03d0			COLOR_BLACK:		EQU 0 
+03d0			COLOR_DARK_RED:     EQU 1 
+03d0			COLOR_DARK_GREEN:   EQU 2 
+03d0			COLOR_BROWN:        EQU 3 
+03d0			COLOR_DARK_BLUE:    EQU 4 
+03d0			COLOR_DARK_MAGENTA: EQU 5 
+03d0			COLOR_DARK_CYAN:    EQU 6 
+03d0			COLOR_LIGHT_GREY:   EQU 7 
+03d0			COLOR_DARK_GREY:    EQU 8 
+03d0			COLOR_RED:          EQU 9 
+03d0			COLOR_GREEN:        EQU 10 
+03d0			COLOR_YELLOW:       EQU 11 
+03d0			COLOR_BLUE:         EQU 12 
+03d0			COLOR_MAGENTA:      EQU 13 
+03d0			COLOR_CYAN:         EQU 14 
+03d0			COLOR_WHITE:        EQU 15 
+03d0			 
+03d0			; Color RAM support 
+03d0			PORT_COLOR_RAM:				EQU 08h 
+03d0			COLOR_RAM_DISABLE:			EQU 00h 
+03d0			COLOR_RAM_ENABLE:			EQU 40h 
+03d0			 
+03d0			; Video Memory Latch 
+03d0			PORT_VIDEO_MEMORY_LATCH:	EQU	1Ch 
+03d0			VML_BANK_SELECT_MASK:		EQU 0Fh 
+03d0			VML_CHARACTER_RAM_ENABLE:	EQU 00h 
+03d0			VML_ATTRIBUTE_RAM_ENABLE:	EQU 10h 
+03d0			VML_EXTENDED_GRAPHICS:		EQU 80h 
+03d0			 
+03d0			; Attributes 
+03d0			ATTR_PCG_BANK_SELECT_MASK:	EQU 0Fh 
+03d0			 
+03d0			KEY_LEFT:     EQU 59 
+03d0			KEY_RIGHT:    EQU 62 
+03d0			KEY_COMMA:    EQU 44 
+03d0			KEY_PERIOD:   EQU 46 
+03d0			KEY_SPACE:    EQU 55 
+03d0			KEY_ENTER:    EQU 52 
+03d0			KEY_1:        EQU 33 
+03d0			KEY_2:        EQU 34 
+03d0			KEY_ESCAPE:   EQU 48 
+03d0			 
+03d0			 
+03d0			; Various CRTC configurations 
+03d0			 
+03d0			CRTC_Registers_64_16:   
+03d0 6b 40 51 37 12 09 10 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x10,0x12 
+03d8 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+03e0			 
+03e0			CRTC_Registers_64_16_b:   
+03e0 6b 40 51 37 12 09 10 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x10,0x12 
+03e8 48 0a 2f 0f 20 00 00 00		DB  0x48,0x0A,0x2F,0x0F,0x20,0x00,0x00,0x00 
+03f0			 
+03f0			CRTC_Registers_64_17:   
+03f0 6b 40 51 37 12 09 11 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x11,0x12 
+03f8 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+0400			 
+0400			CRTC_Registers_64_18:   
+0400 6b 40 51 37 12 09 12 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x12,0x12 
+0408 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+0410			 
+0410			CRTC_Registers_40_25: 
+0410 35 28 2d 24 1b 05 19 1a		DB	0x35,0x28,0x2D,0x24,0x1B,0x05,0x19,0x1A 
+0418 48 0a 2a 0a 00 00 00 00		DB  0x48,0x0A,0x2A,0x0A,0x00,0x00,0x00,0x00 
+0420			 
+0420			CRTC_Registers_80_16: 
+0420 6b 50 59 37 12 09 10 12		DB	0x6B,0x50,0x59,0x37,0x12,0x09,0x10,0x12 
+0428 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+0430			 
+0430			CRTC_Registers_80_24: 
+0430 6b 50 58 37 1b 05 18 1a		DB	0x6B,0x50,0x58,0x37,0x1B,0x05,0x18,0x1A 
+0438 48 0a 2a 0a 20 00 00 00		DB  0x48,0x0A,0x2A,0x0A,0x20,0x00,0x00,0x00 
+0440			 
+0440			CRTC_Registers_80_25: 
+0440 6b 50 58 37 1b 05 19 1a		DB	0x6B,0x50,0x58,0x37,0x1B,0x05,0x19,0x1A 
+0448 48 0a 09 0a 20 00 00 00		DB  0x48,0x0A,0x09,0x0A,0x20,0x00,0x00,0x00 
+0450			 
+0450			 
+0450			; Clear the screen 
+0450			clear_screen: 
+0450 3e 20				LD		A,' ' 
+0452 21 00 f0				LD		HL,CHAR_RAM_BASE 
+0455 11 01 f0				LD		DE,CHAR_RAM_BASE+1 
+0458 01 ff 07				LD		BC,0x800-1 
+045b 77					LD      (HL),A 
+045c ed b0				LDIR 
+045e c9					RET 
+045f			 
+045f			; Clear attribute RAM 
+045f			clear_attribute_buffer: 
+045f 3e 10				LD		A,VML_ATTRIBUTE_RAM_ENABLE 
+0461 d3 1c				OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+0463 3e 00				LD		A,0 
+0465 21 00 f0				LD		HL,ATTR_RAM_BASE 
+0468 11 01 f0				LD		DE,ATTR_RAM_BASE+1 
+046b 01 ff 07				LD		BC,0x800-1 
+046e 77					LD      (HL),A 
+046f ed b0				LDIR 
+0471 3e 00				LD		A,VML_CHARACTER_RAM_ENABLE 
+0473 d3 1c				OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+0475 c9					RET 
+0476			 
+0476			; Fill colour buffer with A 
+0476			clear_color_buffer:	 
+0476 f5					PUSH	AF 
+0477 3e 40				LD		A, COLOR_RAM_ENABLE 
+0479 d3 08				OUT     (PORT_COLOR_RAM),A 
+047b 21 00 f8				LD		HL,COLOR_RAM_BASE 
+047e 11 01 f8				LD		DE,COLOR_RAM_BASE+1 
+0481 01 ff 07				LD		BC,0x800-1 
+0484 f1					POP		AF 
+0485 77					LD		(HL),A 
+0486 ed b0				LDIR 
+0488 3e 00				LD		A,COLOR_RAM_DISABLE 
+048a d3 08				OUT		(PORT_COLOR_RAM),A 
+048c c9					RET 
+048d			 
+048d			; Helper to load CRTC with register values pointed to by HL 
+048d			setup_crtc: 
+048d 0e 00				LD		C,0 
+048f 06 10				LD		B,16 
+0491			L1: 
+0491 79					LD		A,C 
+0492 d3 0c				OUT		(0CH),A 
+0494 7e					LD		A,(HL) 
+0495 d3 0d				OUT		(0DH),A 
+0497 0c					INC		C 
+0498 23					INC		HL 
+0499 10 f6				DJNZ	L1 
+049b c9					RET 
+049c			 
+049c			is_key_down:   
+049c c5					PUSH    BC 
+049d 4f					LD      C,A 
+049e 47					LD      B,A 
+049f 3e 12				LD      A,12h 
+04a1 d3 0c				OUT     (0Ch),A 
+04a3 78					LD      A,B 
+04a4 0f					RRCA 
+04a5 0f					RRCA 
+04a6 0f					RRCA 
+04a7 0f					RRCA 
+04a8 e6 03				AND     03h 
+04aa d3 0d				OUT     (0Dh),A 
+04ac 3e 13				LD      A,13h 
+04ae d3 0c				OUT     (0Ch),A 
+04b0 78					LD      A,B 
+04b1 07					RLCA 
+04b2 07					RLCA 
+04b3 07					RLCA 
+04b4 07					RLCA 
+04b5 d3 0d				OUT     (0Dh),A 
+04b7 3e 01				LD      A,01h 
+04b9 d3 0b				OUT     (0Bh),A 
+04bb 3e 10				LD      A,10h 
+04bd d3 0c				OUT     (0Ch),A 
+04bf db 0d				IN      A,(0Dh) 
+04c1 3e 1f				LD      A,1Fh 
+04c3 d3 0c				OUT     (0Ch),A 
+04c5 d3 0d				OUT     (0Dh),A 
+04c7 db 0c		L095D: 	IN      A,(0Ch) 
+04c9 cb 7f				BIT     7,A 
+04cb 28 fa				JR      Z,L095D 
+04cd db 0c				IN      A,(0Ch) 
+04cf 2f					CPL 
+04d0 cb 77				BIT     6,A 
+04d2 3e 00				LD      A,00h 
+04d4 d3 0b				OUT     (0Bh),A 
+04d6 79					LD      A,C 
+04d7 c1					POP     BC 
+04d8 c9					RET 
+04d9			 
+04d9			 
+04d9			;; Wait for space key 
+04d9			wait_key: 
+04d9 3e 37			LD		A,KEY_SPACE 
+04db cd 9c 04			CALL	is_key_down 
+04de 20 f9			JR		NZ,wait_key 
+04e0			 
+04e0			L_wait2: 
+04e0 3e 37			LD		A,KEY_SPACE 
+04e2 cd 9c 04			CALL	is_key_down 
+04e5 28 f9			JR		Z,L_wait2 
+04e7 c9				RET 
+04e8			 
+04e8			 
+04e8					; print integer in HL to DE 
+04e8			prt_int_word: 
+04e8 3e 30				LD		A,'0' 
+04ea 32 20 40				LD		(LIB_SCRATCH+0),A 
+04ed 01 f0 d8				ld		bc,-10000 
+04f0 cd 09 05				call	Num1 
+04f3 01 18 fc				ld		bc,-1000 
+04f6 cd 09 05				call	Num1 
+04f9 01 9c ff				ld		bc,-100 
+04fc cd 09 05				call	Num1 
+04ff 0e f6				ld		c,-10 
+0501 cd 09 05				call	Num1 
+0504 48					ld		c,b 
+0505 af					XOR		A 
+0506 32 20 40				LD		(LIB_SCRATCH+0),A 
+0509			 
+0509			Num1:		 
+0509 3e 2f				ld		a,'0'-1 
+050b			Num2:	 
+050b 3c					inc		a 
+050c 09					add		hl,bc 
+050d 38 fc				jr		c,Num2 
+050f ed 42				sbc		hl,bc 
+0511			 
+0511 4f					LD		C,A 
+0512 3a 20 40				LD		A,(LIB_SCRATCH+0) 
+0515 b9					cp		C 
+0516 c8					ret		Z 
+0517 79					LD		A,C 
+0518			 
+0518 12					ld		(de),A 
+0519 13					inc		de 
+051a af					XOR		A 
+051b 32 20 40				LD		(LIB_SCRATCH+0),A 
+051e c9					ret 
+051f			 
+051f					; print hex word in HL to DE 
+051f			prt_hex_word: 
+051f 7c					LD		A,H 
+0520 cd 28 05				CALL	prt_hex_byte 
+0523 7d					LD		A,L 
+0524 cd 28 05				CALL	prt_hex_byte 
+0527 c9					ret 
+0528			 
+0528					; print hex byte in A to DE 
+0528			prt_hex_byte: 
+0528 f5					PUSH	AF 
+0529 cb 3f				SRL		A 
+052b cb 3f				SRL		A 
+052d cb 3f				SRL		A 
+052f cb 3f				SRL		A 
+0531 cd 35 05				CALL	prt_hex_nib 
+0534 f1					POP		AF 
+0535					;; fall through 
+0535			 
+0535			 
+0535					; print low nibble of A to DE 
+0535			prt_hex_nib: 
+0535 e6 0f				and     0xF 
+0537 fe 0a				cp      0xA 
+0539 38 05				jr      c,lt10 
+053b c6 37				add		'A' - 0xA; 
+053d 12					ld		(de),a 
+053e 13					inc		de 
+053f c9					ret 
+0540			lt10: 
+0540 c6 30				add		'0' 
+0542 12					ld		(de),a 
+0543 13					inc		de 
+0544 c9					ret; 
+0545			 
+0545			 
+# End of file CommonDefs.asm
+0545			 
+# End of file FTest.asm
+0545

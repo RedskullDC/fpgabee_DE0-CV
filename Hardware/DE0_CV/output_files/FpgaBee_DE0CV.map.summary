@@ -1,0 +1,17 @@
+Analysis & Synthesis Status : Successful - Thu Sep 03 19:14:42 2020
+Quartus Prime Version : 17.0.2 Build 602 07/19/2017 SJ Standard Edition
+Revision Name : FpgaBee_DE0CV
+Top-level Entity Name : FpgaBee_DE0CV
+Family : Cyclone V
+Logic utilization (in ALMs) : N/A
+Total registers : 1651
+Total pins : 71
+Total virtual pins : 0
+Total block memory bits : 246,224
+Total DSP Blocks : 1
+Total HSSI RX PCSs : 0
+Total HSSI PMA RX Deserializers : 0
+Total HSSI TX PCSs : 0
+Total HSSI PMA TX Serializers : 0
+Total PLLs : 1
+Total DLLs : 0

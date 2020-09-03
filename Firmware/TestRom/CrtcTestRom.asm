@@ -1,0 +1,313 @@
+		ORG			08000h
+
+RAM_BASE:			EQU		7000h
+LIB_SCRATCH:		EQU		RAM_BASE
+Current_Screen:		EQU		RAM_BASE+0x10
+
+START:
+	LD		SP,0x8000
+
+	XOR		A
+	LD		(Current_Screen),A
+
+	; Copy letters to RAM (testing)
+	LD		DE,0x3000
+	LD		HL,LETTERS
+	LD		BC,LETTERS_END-LETTERS
+	LDIR 
+
+	CALL	SETUP_PCG_BANKS
+
+L_restart:
+	; Setup 64x16
+	LD		A,(Current_Screen)
+	add		a
+	add		a
+	add		a
+	add		a
+	LD		E,A
+	LD		D,0
+	LD		HL,CRTC_Registers_64_16
+	ADD		HL,DE
+	CALL	SHOW_TEST_PATTERN
+
+	CALL	wait_key
+
+	LD		A,80h
+	OUT		(0x1c),A
+
+	CALL	wait_key
+
+	LD		A,0h
+	OUT		(0x1c),A
+
+	LD		A,(Current_Screen)
+	INC		A
+	AND		0x07
+	LD		(Current_Screen),A
+
+	JR		L_restart
+ 
+
+SHOW_TEST_PATTERN:
+	
+	PUSH	HL		; Save for later
+	POP     IX
+
+	; Get the line
+	LD		A,(IX+1)
+	LD		E,A
+	LD		D,0
+	PUSH	DE
+
+	CALL	setup_crtc
+
+	; Select colour buffer and fill it with color
+	LD		A, COLOR_RAM_ENABLE
+	OUT     (PORT_COLOR_RAM),A
+	LD		HL,COLOR_RAM_BASE
+	LD		DE,COLOR_RAM_BASE+1
+	LD		BC,0x800-1
+	LD		(HL),COLOR_MAGENTA
+	LDIR
+	LD		A,COLOR_RAM_DISABLE
+	OUT		(PORT_COLOR_RAM),A
+
+	; Clear the screen
+	LD		A,' '
+	LD		HL,CHAR_RAM_BASE
+	LD		DE,CHAR_RAM_BASE+1
+	LD		BC,0x800-1
+	LD      (HL),A
+	LDIR
+
+	; Clear attribute RAM
+	LD		A,VML_ATTRIBUTE_RAM_ENABLE
+	OUT		(PORT_VIDEO_MEMORY_LATCH),A
+	LD		A,0
+	LD		HL,ATTR_RAM_BASE
+	LD		DE,ATTR_RAM_BASE+1
+	LD		BC,0x800-1
+	LD      (HL),A
+	LDIR
+	LD		A,VML_CHARACTER_RAM_ENABLE
+	OUT		(PORT_VIDEO_MEMORY_LATCH),A
+	
+	; Program a PCG block
+	LD		HL,CHAR
+	LD		DE,PCG_RAM_BASE
+	LD		BC,16
+	LDIR
+
+	; Select color ram again
+	LD		A, COLOR_RAM_ENABLE
+	OUT     (PORT_COLOR_RAM),A
+
+	; Row 0 = foreground color
+	LD		A,0F0h
+	LD		B,16
+	LD		HL,COLOR_RAM_BASE
+L2:
+	LD		(HL),A
+	INC		HL
+	INC		A
+	DJNZ	L2
+
+	; Row 1 = background color
+	LD		A,00h
+	LD		B,16
+	POP		DE
+	PUSH	DE
+	LD		HL,COLOR_RAM_BASE
+	ADD		HL,DE
+L3:
+	LD		(HL),A
+	INC		HL
+	ADD		A,10h
+	DJNZ	L3
+
+	; Setup 16 x blocks
+	LD		HL,CHAR_RAM_BASE
+	LD		DE,CHAR_RAM_BASE+1
+	LD		BC,31
+	LD		(HL),128
+	LDIR
+
+
+	LD		A,VML_ATTRIBUTE_RAM_ENABLE
+	OUT		(PORT_VIDEO_MEMORY_LATCH),A
+
+	LD		B,32
+	LD		DE,CHAR_RAM_BASE+16
+	LD		A,0
+L4:	LD		(DE),A
+	INC		DE
+	INC		A
+	DJNZ	L4
+
+	LD		A,VML_CHARACTER_RAM_ENABLE
+	OUT		(PORT_VIDEO_MEMORY_LATCH),A
+
+
+
+	;Show Alphanumerics
+	POP		DE
+	PUSH	DE
+	LD		HL,CHAR_RAM_BASE 
+	ADD		HL,DE
+	ADD		HL,DE
+	PUSH	HL
+	POP		DE
+	LD		HL,LETTERS
+	LD		BC,LETTERS_END-LETTERS
+	LDIR 
+
+	POP		DE
+	PUSH	DE
+	LD		HL,CHAR_RAM_BASE
+	ADD		HL,DE
+	ADD		HL,DE
+	ADD		HL,DE
+	ADD		HL,DE
+	PUSH	HL
+	POP		DE
+
+	LD		L,(IX+1)
+	LD		H,0
+	CALL	prt_int_word
+
+	INC		DE
+	INC		DE
+	LD		L,(IX+6)
+	LD		H,0
+	CALL	prt_int_word
+
+	INC		DE
+	INC		DE
+	LD		L,(IX+9)
+	INC		L
+	LD		H,0
+	CALL	prt_int_word
+
+
+
+	POP		DE
+	RET
+
+SETUP_PCG_BANKS:
+	LD		A,0x80
+	OUT		(0x1C),A
+	LD		HL,CHAR_0
+	LD		DE,0xF800
+	LD		BC,16
+	LDIR
+
+	LD		A,0x81
+	OUT		(0x1C),A
+	LD		HL,CHAR_1
+	LD		DE,0xF800
+	LD		BC,16
+	LDIR
+
+	LD		A,0x82
+	OUT		(0x1C),A
+	LD		HL,CHAR_2
+	LD		DE,0xF800
+	LD		BC,16
+	LDIR
+
+	LD		A,0x83
+	OUT		(0x1C),A
+	LD		HL,CHAR_3
+	LD		DE,0xF800
+	LD		BC,16
+	LDIR
+
+	LD		A,0x84
+	OUT		(0x1C),A
+	LD		HL,CHAR_4
+	LD		DE,0xF800
+	LD		BC,16
+	LDIR
+
+	LD		A,0x85
+	OUT		(0x1C),A
+	LD		HL,CHAR_5
+	LD		DE,0xF800
+	LD		BC,16
+	LDIR
+
+	LD		A,0x86
+	OUT		(0x1C),A
+	LD		HL,CHAR_6
+	LD		DE,0xF800
+	LD		BC,16
+	LDIR
+
+	LD		A,0x87
+	OUT		(0x1C),A
+	LD		HL,CHAR_7
+	LD		DE,0xF800
+	LD		BC,16
+	LDIR
+
+	LD		A,0
+	OUT		(0x1c),A
+
+	RET
+
+
+
+LETTERS:
+	DB	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+LETTERS_END:
+
+; A PCG Character Block
+CHAR:
+	DB	0x00,0x00,0x00,0x00,0x7e,0x7e,0x7e,0x7e
+	DB  0x7e,0x7e,0x7e,0x7e,0x00,0x00,0x00,0x00
+
+; Another PCG Character Block
+CHAR_1:
+	DB	0x04,0x04,0x04,0x04,0x04,0x00,0x00,0x00
+	DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+
+CHAR_2:
+	DB	0x03c,0x04,0x3c,0x20,0x3c,0x00,0x00,0x00
+	DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+
+CHAR_3:
+	DB	0x03c,0x04,0x3c,0x04,0x3c,0x00,0x00,0x00
+	DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+
+CHAR_4:
+	DB	0x24,0x24,0x3c,0x04,0x04,0x00,0x00,0x00
+	DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+
+CHAR_5:
+	DB	0x3c,0x20,0x3c,0x04,0x3c,0x00,0x00,0x00
+	DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+
+CHAR_6:
+	DB	0x3c,0x20,0x3c,0x24,0x3c,0x00,0x00,0x00
+	DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+
+CHAR_7:
+	DB	0x3c,0x04,0x04,0x04,0x04,0x00,0x00,0x00
+	DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+
+CHAR_8:
+	DB	0x3c,0x24,0x3c,0x24,0x3c,0x00,0x00,0x00
+	DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+
+CHAR_9:
+	DB	0x3c,0x24,0x3c,0x04,0x3c,0x00,0x00,0x00
+	DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+
+CHAR_0:
+	DB	0x3c,0x24,0x24,0x24,0x3c,0x00,0x00,0x00
+	DB  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+
+
+include "CommonDefs.asm"
+

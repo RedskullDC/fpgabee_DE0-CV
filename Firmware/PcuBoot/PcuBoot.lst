@@ -1,0 +1,2747 @@
+# File PcuBoot.asm
+0000			DEBUG:				EQU 0 
+0000			 
+0000			if DEBUG 
+0000			RAM_LO:					EQU	0x100 
+0000			RAM_HI:					EQU	0x4000 
+0000			else 
+0000			RAM_LO:					EQU	0x4000 
+0000			RAM_HI:					EQU	0x8000 
+0000			endif 
+0000			 
+0000			; FBFS Config Sector 
+0000			FBFS_SIG:			EQU		0 
+0000			FBFS_VER:			EQU		FBFS_SIG + 4 
+0000			FBFS_DIRBLK:		EQU		FBFS_VER + 2 
+0000			FBFS_DIRCOUNT:		EQU		FBFS_DIRBLK + 4 
+0000			FBFS_DI_SYSTEM:		EQU		FBFS_DIRCOUNT + 2 
+0000			FBFS_DI_ROM_0:		EQU		FBFS_DI_SYSTEM + 2 
+0000			FBFS_DI_ROM_1:		EQU		FBFS_DI_ROM_0 + 2 
+0000			FBFS_DI_ROM_2:		EQU		FBFS_DI_ROM_1 + 2 
+0000			FBFS_DI_DISK_0:		EQU		FBFS_DI_ROM_2 + 2 
+0000			FBFS_DI_DISK_1:		EQU		FBFS_DI_DISK_0 + 2 
+0000			FBFS_DI_DISK_2:		EQU		FBFS_DI_DISK_1 + 2 
+0000			FBFS_DI_DISK_3:		EQU		FBFS_DI_DISK_2 + 2 
+0000			FBFS_DI_DISK_4:		EQU		FBFS_DI_DISK_3 + 2 
+0000			FBFS_DI_DISK_5:		EQU		FBFS_DI_DISK_4 + 2 
+0000			FBFS_DI_DISK_6:		EQU		FBFS_DI_DISK_5 + 2 
+0000			FBFS_CONFIG_SIZE:	EQU		FBFS_DI_DISK_6 + 2	 
+0000			 
+0000			; FBFS Directory structure 
+0000			DIR_BLOCK:			EQU		0 
+0000			DIR_BLOCK_COUNT:	EQU		4 
+0000			DIR_RESERVED:		EQU		6 
+0000			DIR_FILENAME:		EQU		10 
+0000			DIR_SIZE:			EQU		32 
+0000			 
+0000			MAX_FILENAME:		EQU		22		; Maximum length of filename (including the NULL) 
+0000			 
+0000			; Global Variables 
+0000			ORG						RAM_LO 
+4000 00...		SECTOR_BUFFER:			DEFS	512 
+4200 00 00		HEAP_FREE_CHAIN:		DW	0 
+4202 00 00		HEAP_HI_WATER:			DW 	0 
+4204 0x00...		FBFS_CONFIG:			defs FBFS_CONFIG_SIZE, 0 
+4226 00 00		PTR_DIRECTORY:			DW	0 
+4228 00 00		TOTAL_DIR_ENTRIES:		DW	0 
+422a 00...		MENU_STR_HD1:			defs 32 
+424a 00...		MENU_STR_FD0:			defs 32 
+426a 00...		MENU_STR_FD1:			defs 32 
+428a 00...		MENU_STR_FD2:			defs 32 
+42aa 00...		SCRATCH:				defs 8 
+42b2			if DEBUG 
+42b2			DEBUG_PREV_KEY:			DB	0 
+42b2			DEBUG_SCRATCH:			DEFS	128 
+42b2			else 
+42b2 00 00		SAVE_MBEE_SP:			DW	0 
+42b4 00 00		SAVE_PCU_SP:			DW	0 
+42b6 00 00 00 00 00 00 00 00 00 00 00 00	SAVE_MBEE_REGS:			DW	0,0,0,0,0,0 
+42c2			SAVE_MBEE_REGS_TOS: 
+42c2			endif 
+42c2 00...		DEBUG_DATA:				defs	32 
+42e2			END_OF_STATIC_DATA:		 
+42e2			SEEK					0 
+42e2			 
+42e2			HEAP_BASE_ADDRESS:		EQU END_OF_STATIC_DATA 
+42e2			 
+42e2			; Startup setups entry point + NMI vector + yield implementation 
+42e2			include "Startup.asm" 
+42e2			if DEBUG 
+42e2			 
+42e2				ORG		8000h 
+42e2				jp		PCU_MAIN 
+42e2			 
+42e2			else 
+42e2			 
+42e2				ORG		0 
+0000 c3 02 0a			JP		PCU_MAIN	 
+0003 00...			defs	0x66-$ 
+0066			NMI_VECTOR: 
+0066 c3 00 01			JP		PCU_NMI 
+0069 00...			defs	0x100-$ 
+0100			 
+0100			PCU_NMI: 
+0100				; Save Microbee state 
+0100 ed 73 b2 42		ld		(SAVE_MBEE_SP),SP 
+0104 31 c2 42			ld		SP,SAVE_MBEE_REGS_TOS 
+0107 f5				push	AF 
+0108 c5				push	BC 
+0109 d5				push	DE 
+010a e5				push	HL 
+010b dd e5			push	IX 
+010d fd e5			push	IY 
+010f			 
+010f				; Restore PCU state 
+010f ed 7b b4 42		ld		SP,(SAVE_PCU_SP) 
+0113 fd e1			pop		IY 
+0115 dd e1			pop		IX 
+0117 e1				pop		HL 
+0118 d1				pop		DE 
+0119 c1				pop		BC 
+011a f1				pop		AF 
+011b			 
+011b				; Carry on 
+011b c9				ret 
+011c			PCU_NMI_END: 
+011c			 
+011c			YIELD: 
+011c				; Save PCU state 
+011c f5				push	AF 
+011d c5				push	BC 
+011e d5				push	DE 
+011f e5				push	HL 
+0120 dd e5			push	IX 
+0122 fd e5			push	IY 
+0124 ed 73 b4 42		ld		(SAVE_PCU_SP),SP 
+0128			 
+0128				; Restore Microbee state 
+0128 31 b6 42			ld		SP,SAVE_MBEE_REGS 
+012b fd e1			pop		IY 
+012d dd e1			pop		IX 
+012f e1				pop		HL 
+0130 d1				pop		DE 
+0131 c1				pop		BC 
+0132 f1				pop		AF 
+0133 ed 7b b2 42		ld		SP,(SAVE_MBEE_SP) 
+0137			 
+0137				; Request PCU exit 
+0137 d3 80			out		(0x80),A		 
+0139 ed 45			retn 
+013b			YIELD_END: 
+013b			 
+013b			endif 
+013b			 
+# End of file Startup.asm
+013b			 
+013b			; Debug/release mode 
+013b			if DEBUG 
+013b				include "Debug.asm" 
+013b			else 
+013b				include "Release.asm" 
+013b			SCREEN_WIDTH:			EQU	32 
+013b			SCREEN_HEIGHT:			EQU	16 
+013b			VCHAR_RAM:				EQU	0xF000 
+013b			COLOR_RAM:				EQU 0xF200 
+013b			VBUFFER_SIZE:			EQU SCREEN_WIDTH * SCREEN_HEIGHT 
+013b			HEAP_SIZE:				EQU	0x3800 
+013b			ROM_PACK_LOAD_ADDR:		EQU	0x8000 
+013b			COLOR_RAM_IN: macro 
+013b				endm 
+013b			COLOR_RAM_OUT: macro 
+013b				endm 
+013b			 
+013b			READ_KEY: 
+013b e5				push	HL 
+013c d5				push	DE 
+013d			rk_loop: 
+013d				; Read's a single key from the keyboard, yielding back to  
+013d				; the Microbee if none available 
+013d db 82			in		A,(0x82) 
+013f 5f				ld		E,A 
+0140 db 83			in		A,(0x83) 
+0142 cb 7f			bit		7,A			; bit 7 = 1 if key available 
+0144 20 05			jr		NZ,rk_1 
+0146 cd 1c 01			call	YIELD 
+0149 18 f2			jr		rk_loop 
+014b			 
+014b			rk_1: 
+014b 16 00			ld		D,0 
+014d 21 68 03			ld		HL,SCANCODE_TO_VK_TABLE  
+0150 19				add		HL,DE 
+0151 19				add		HL,DE 
+0152 cb 47			bit		0,A 
+0154 28 01			jr		Z,rk_not_extended 
+0156 23				inc		HL 
+0157			rk_not_extended: 
+0157 7e				ld		A,(HL) 
+0158			 
+0158				; F12 always toggles display 
+0158 fe 1c			cp		VK_F12 
+015a 20 08			jr		NZ,rk_have_key 
+015c db 81			in		A,(0x81) 
+015e ee 03			xor		3 
+0160 d3 81			out		(0x81),A 
+0162 18 d9			jr		rk_loop 
+0164			 
+0164			rk_have_key: 
+0164 d1				pop		DE 
+0165 e1				pop		HL 
+0166 c9				ret 
+0167			 
+0167			READ_KEY_END: 
+0167			 
+0167			 
+0167			; Read block DEBC in to buffer at HL 
+0167			DISK_READ: 
+0167			 
+0167				; Setup block number 
+0167 79				ld		A,C 
+0168 0e c1			ld		C,0xC1 
+016a ed 79			out		(C),A 
+016c ed 41			out		(C),B 
+016e ed 59			out		(C),E 
+0170 ed 51			out		(C),D 
+0172			 
+0172				; Initiate the read command 
+0172 3e 00			ld			A,0 
+0174 d3 c7			out			(0xC7),A 
+0176			 
+0176				; Wait for read to finish 
+0176			dr_wait:	 
+0176 db c7			in		A,(0xC7) 
+0178 e6 80			and		0x80 
+017a 20 fa			JR		NZ,dr_wait 
+017c			 
+017c				; Read it 
+017c 01 c0 00			ld		BC,0x00C0 
+017f ed b2			inir 
+0181 ed b2			inir 
+0183			 
+0183				; Done! 
+0183 c9				ret 
+0184			DISK_READ_END: 
+0184			 
+0184			; Write block DEBC from SECTOR_BUFFER 
+0184			DISK_WRITE: 
+0184			 
+0184				; Setup block number 
+0184 79				ld		A,C 
+0185 0e c1			ld		C,0xC1 
+0187 ed 79			out		(C),A 
+0189 ed 41			out		(C),B 
+018b ed 59			out		(C),E 
+018d ed 51			out		(C),D 
+018f			 
+018f				; Initiate the write command 
+018f 3e 01			ld			A,01h 
+0191 d3 c7			out			(0xC7),A 
+0193			 
+0193				; Read it 
+0193 01 c0 00			ld		BC,0x00C0 
+0196 ed b3			otir 
+0198 ed b3			otir 
+019a			 
+019a				; Wait for write to finish 
+019a			dw_wait:	 
+019a db c7			in		A,(0xC7) 
+019c e6 80			and		0x80 
+019e 20 fa			JR		NZ,dw_wait 
+01a0			 
+01a0				; Done! 
+01a0 c9				ret 
+01a1			DISK_WRITE_END: 
+01a1			 
+# End of file Release.asm
+01a1			endif 
+01a1			 
+01a1			; Library 
+01a1			include "Utils.asm" 
+01a1			if DEBUG 
+01a1				BOX_TL:		EQU	6 + 128 
+01a1				BOX_TR:		EQU 3 + 128 
+01a1				BOX_BL:		EQU	4 + 128 
+01a1				BOX_BR:		EQU 5 + 128 
+01a1				BOX_H:		EQU 1 + 128 
+01a1				BOX_V:		EQU 2 + 128 
+01a1			else 
+01a1				BOX_TL:		EQU	6 
+01a1				BOX_TR:		EQU 3 
+01a1				BOX_BL:		EQU	4 
+01a1				BOX_BR:		EQU 5 
+01a1				BOX_H:		EQU 1 
+01a1				BOX_V:		EQU 2 
+01a1			endif 
+01a1			 
+01a1			; Draw a box border 
+01a1			;   HL = base address 
+01a1			;   BC = height/with 
+01a1			DRAW_BORDER_AT: 
+01a1 dd 21 f6 ff		ld		IX,-10 
+01a5 dd 39			add		IX,SP 
+01a7			 
+01a7				; Save dimensions 
+01a7 dd 71 00			ld		(IX+0),C 
+01aa dd 70 01			ld		(IX+1),B 
+01ad			 
+01ad e5				push	HL 
+01ae			 
+01ae				; Top left corner		 
+01ae 36 06			ld		(HL),BOX_TL	 
+01b0 23				inc		HL 
+01b1			 
+01b1				; Top edge 
+01b1 dd 4e 00			ld		C,(IX+0) 
+01b4 0d				dec		C 
+01b5 0d				dec		C 
+01b6 06 00			ld		B,0 
+01b8 e5				push	HL 
+01b9 d1				pop		DE 
+01ba 13				inc		DE 
+01bb 36 01			ld		(HL),BOX_H 
+01bd ed b0			ldir 
+01bf			 
+01bf				; Top right corner 
+01bf 36 03			ld		(HL),BOX_TR 
+01c1 23				inc		HL 
+01c2			 
+01c2				; Right edge 
+01c2 e1				pop		HL 
+01c3 e5				push	HL 
+01c4 dd 5e 00			ld		E,(IX+0) 
+01c7 16 00			ld		D,0 
+01c9 1d				dec		E 
+01ca 19				add		HL,DE				; Move to RHS 
+01cb 11 20 00			ld		DE,SCREEN_WIDTH		; Move to second row 
+01ce 19				add		HL,DE 
+01cf			 
+01cf dd 46 01			ld		B,(IX+1)			; Number of rows 
+01d2 05				dec		B 
+01d3 05				dec		B					; Exclude top/bottom 
+01d4			dba_l1: 
+01d4 36 02			ld		(HL),BOX_V 
+01d6 19				add		HL,DE 
+01d7 10 fb			djnz	dba_l1 
+01d9			 
+01d9				; Left edge 
+01d9 e1				pop		HL 
+01da 11 20 00			ld		DE,SCREEN_WIDTH 
+01dd 19				add		HL,DE 
+01de			 
+01de dd 46 01			ld		B,(IX+1)			; Number of rows 
+01e1 05				dec		B 
+01e2 05				dec		B					; Exclude top/bottom 
+01e3			dba_l2: 
+01e3 36 02			ld		(HL),BOX_V 
+01e5 19				add		HL,DE 
+01e6 10 fb			djnz	dba_l2 
+01e8			 
+01e8				; Bottom left 
+01e8 36 04			ld		(HL),BOX_BL 
+01ea 23				inc		HL 
+01eb			 
+01eb				; Bottom edge 
+01eb dd 4e 00			ld		C,(IX+0) 
+01ee 0d				dec		C 
+01ef 0d				dec		C 
+01f0 06 00			ld		B,0 
+01f2 e5				push	HL 
+01f3 d1				pop		DE 
+01f4 13				inc		DE 
+01f5 36 01			ld		(HL),BOX_H 
+01f7 ed b0			ldir 
+01f9			 
+01f9				; Bottom right corner 
+01f9 36 05			ld		(HL),BOX_BR 
+01fb 23				inc		HL 
+01fc			 
+01fc c9				ret 
+01fd			 
+01fd			DRAW_BORDER_AT_END: 
+01fd			 
+01fd			; Clear character ram 
+01fd			CLEAR_SCREEN: 
+01fd 21 00 f0			ld		HL,VCHAR_RAM 
+0200 11 01 f0			ld		DE,VCHAR_RAM+1 
+0203 01 ff 01			ld		BC,VBUFFER_SIZE-1 
+0206 36 20			ld		(HL),' ' 
+0208 ed b0			ldir 
+020a c9				ret 
+020b			CLEAR_SCREEN_END: 
+020b			 
+020b			 
+020b			; Clear color ram to color A 
+020b			CLEAR_COLOR: 
+020b				COLOR_RAM_IN 
+020b				endm 
+# End of macro COLOR_RAM_IN
+020b 21 00 f2			ld		HL,COLOR_RAM 
+020e 11 01 f2			ld		DE,COLOR_RAM+1 
+0211 01 ff 01			ld		BC,VBUFFER_SIZE-1 
+0214 77				ld		(HL),A 
+0215 ed b0			ldir 
+0217				COLOR_RAM_OUT 
+0217				endm 
+# End of macro COLOR_RAM_OUT
+0217 c9				ret 
+0218			CLEAR_COLOR_END: 
+0218			 
+0218			 
+0218					; print hex word in HL to DE 
+0218			PRT_HEX_WORD: 
+0218 7c					LD		A,H 
+0219 cd 21 02				CALL	PRT_HEX_BYTE 
+021c 7d					LD		A,L 
+021d cd 21 02				CALL	PRT_HEX_BYTE 
+0220 c9					ret 
+0221			 
+0221					; print hex byte in A to DE 
+0221			PRT_HEX_BYTE: 
+0221 f5					PUSH	AF 
+0222 cb 3f				SRL		A 
+0224 cb 3f				SRL		A 
+0226 cb 3f				SRL		A 
+0228 cb 3f				SRL		A 
+022a cd 2e 02				CALL	PRT_HEX_NIB 
+022d f1					POP		AF 
+022e					;; fall through 
+022e			 
+022e			 
+022e					; print low nibble of A to DE 
+022e			PRT_HEX_NIB: 
+022e e6 0f				and     0xF 
+0230 fe 0a				cp      0xA 
+0232 38 05				jr      c,lt10 
+0234 c6 37				add		'A' - 0xA; 
+0236 12					ld		(de),a 
+0237 13					inc		de 
+0238 c9					ret 
+0239			lt10: 
+0239 c6 30				add		'0' 
+023b 12					ld		(de),a 
+023c 13					inc		de 
+023d c9					ret; 
+023e			PRT_HEX_WORD_END: 
+023e			 
+023e			 
+023e			 
+023e			; Multiply H by E, result in HL 
+023e			MUL_H_E: 
+023e			 
+023e 2e 00		   ld	l, 0 
+0240 55			   ld	d, l 
+0241			 
+0241 cb 24		   sla	h	 
+0243 30 01		   jr	nc, $+3 
+0245 6b			   ld	l, e 
+0246			    
+0246 06 07		   ld b, 7 
+0248			mulhe_loop: 
+0248 29			   add	hl, hl           
+0249 30 01		   jr	nc, $+3 
+024b 19			   add	hl, de 
+024c			    
+024c 10 fa		   djnz	mulhe_loop 
+024e			    
+024e c9			   ret 
+024f			MUL_H_E_END: 
+024f			 
+024f			; Divide AC by DE 
+024f			; Returns quotient in AC and remainder in HL 
+024f			;DIV_AC_DE: 
+024f			;   ld	hl, 0 
+024f			;   ld	b, 16 
+024f			; 
+024f			;div_ac_de_loop: 
+024f			;   sll	c 
+024f			;   rla 
+024f			;   adc	hl, hl 
+024f			;   sbc	hl, de 
+024f			;   jr	nc, $+4 
+024f			;   add	hl, de 
+024f			;   dec	c 
+024f			;    
+024f			;   djnz	div_ac_de_loop 
+024f			;    
+024f			;   ret 
+024f			;DIV_AC_DE_END: 
+024f			 
+024f			; Divide HL by C 
+024f			; Returns quotient in HL, remainder in A 
+024f			DIV_HL_C: 
+024f af			   xor	a 
+0250 06 10		   ld	b, 16 
+0252			 
+0252			div_hl_c_loop: 
+0252 29			   add	hl, hl 
+0253 17			   rla 
+0254 b9			   cp	c 
+0255 38 02		   jr	c, $+4 
+0257 91			   sub	c 
+0258 2c			   inc	l 
+0259			    
+0259 10 f7		   djnz	div_hl_c_loop 
+025b			    
+025b c9			   ret 
+025c			 DIV_HL_C_END: 
+025c			  
+025c			 
+025c			; HL = pointer to screen buffer 
+025c			; B = number of rows 
+025c			; C = number of columns 
+025c			; A = fill with 
+025c			CLEAR_SCREEN_AREA: 
+025c			 
+025c			csa_fill: 
+025c c5				push	BC				; Save number of rows/cols 
+025d e5				push	HL				; Save current row pointer 
+025e			 
+025e 77				ld		(HL),A			; Set fill character 
+025f e5				push	HL				 
+0260 d1				pop		DE 
+0261 13				inc		DE				; DE = HL + 1 
+0262 06 00			ld		B,0				; Number of columns in BC 
+0264 0d				dec		C 
+0265 ed b0			ldir					; memset 
+0267			 
+0267 e1				pop		HL				; Restore row pointer 
+0268 c1				pop		BC				; Restore row/col count 
+0269 11 20 00			ld		DE,SCREEN_WIDTH 
+026c 19				add		HL,DE			; Next line 
+026d 10 ed			djnz	csa_fill 
+026f c9				ret 
+0270			CLEAR_SCREEN_AREA_END: 
+0270			 
+0270			; Save a copy of a screen area 
+0270			; 	HL = offset from start of color/char buffer 
+0270			; 	B = number of rows 
+0270			; 	C = number of columns 
+0270			; Returns ptr to malloced saved screen 
+0270			SAVE_SCREEN_AREA: 
+0270			 
+0270				; Save params 
+0270 e5				push	HL 
+0271 c5				push	BC 
+0272			 
+0272				; Work out how much room required to store character 
+0272				; and color buffers 
+0272 60				ld		H,B 
+0273 59				ld		E,C 
+0274 cd 3e 02			call	MUL_H_E			; HL = b*c 
+0277 29				add		HL,HL			; HL = 2*b*c (chars+color) 
+0278 11 04 00			ld		DE,4 
+027b 19				add		HL,DE			; HL = 4 + 2*b*c 
+027c			 
+027c				; Allocate a block from the heap 
+027c e5				push	HL 
+027d c1				pop		BC 
+027e cd 7e 07			call	HeapAlloc 
+0281 e5				push	HL 
+0282 dd e1			pop		IX				; IX = Allocated block 
+0284			 
+0284				; Restore params 
+0284 c1				pop		BC 
+0285 d1				pop		DE 
+0286			 
+0286				; Save params to allocated block 
+0286 dd 73 00			ld		(IX+0),E 
+0289 dd 72 01			ld		(IX+1),D 
+028c dd 71 02			ld		(IX+2),C 
+028f dd 70 03			ld		(IX+3),B 
+0292			 
+0292				; Setup DE as destination for the copy 
+0292 11 04 00			ld		DE,4 
+0295 19				add		HL,DE 
+0296 eb				ex		DE,HL			; DE - allocation + 4 bytes 
+0297			 
+0297				; Copy colors 
+0297 dd 4e 00			ld		C,(IX+0) 
+029a dd 46 01			ld		B,(IX+1) 
+029d 21 00 f2			ld		HL,COLOR_RAM	 
+02a0 09				add		HL,BC			; HL = source 
+02a1				COLOR_RAM_IN 
+02a1				endm 
+# End of macro COLOR_RAM_IN
+02a1 cd b5 02			call	psa_copy		; Copy it 
+02a4				COLOR_RAM_OUT 
+02a4				endm 
+# End of macro COLOR_RAM_OUT
+02a4			 
+02a4				; Copy characters 
+02a4 dd 4e 00			ld		C,(IX+0) 
+02a7 dd 46 01			ld		B,(IX+1) 
+02aa 21 00 f0			ld		HL,VCHAR_RAM 
+02ad 09				add		HL,BC 
+02ae cd b5 02			call 	psa_copy 
+02b1			 
+02b1 dd e5			push	IX 
+02b3 e1				pop		HL 
+02b4 c9				ret 
+02b5			 
+02b5			psa_copy: 
+02b5 dd 46 03			ld		B,(IX+3) 
+02b8			ssa_l1: 
+02b8 c5				push	BC 
+02b9 e5				push	HL				; Save current row pointer 
+02ba			 
+02ba 06 00			ld		B,0				; Number of columns in BC 
+02bc dd 4e 02			ld		C,(IX+2) 
+02bf ed b0			ldir					; copy it 
+02c1			 
+02c1 e1				pop		HL				; Restore row pointer 
+02c2			 
+02c2 01 20 00			ld		BC,SCREEN_WIDTH 
+02c5 09				add		HL,BC			; Next line 
+02c6			 
+02c6 c1				pop		BC 
+02c7			 
+02c7 10 ef			djnz	ssa_l1		; Repeat B times 
+02c9 c9				ret 
+02ca			 
+02ca			SAVE_SCREEN_AREA_END: 
+02ca			 
+02ca			 
+02ca			; Restore a previously pushed copy of a screen area from the stack 
+02ca			;  HL - Saved block 
+02ca			RESTORE_SCREEN_AREA: 
+02ca			 
+02ca e5				push	HL 
+02cb dd e1			pop		IX 
+02cd			 
+02cd				; Calculate destination ptr 
+02cd 21 00 f2			ld		HL,COLOR_RAM 
+02d0 dd 5e 00			ld		E,(IX+0) 
+02d3 dd 56 01			ld		D,(IX+1) 
+02d6 19				add		HL,DE 
+02d7 eb				ex		DE,HL 
+02d8			 
+02d8				; Calculate source ptr 
+02d8 01 04 00			ld		BC,4 
+02db dd e5			push	IX 
+02dd e1				pop		HL 
+02de 09				add		HL,BC 
+02df			 
+02df				; Copy region 
+02df				COLOR_RAM_IN 
+02df				endm 
+# End of macro COLOR_RAM_IN
+02df cd f9 02			call 	rsa_copy 
+02e2				COLOR_RAM_OUT 
+02e2				endm 
+# End of macro COLOR_RAM_OUT
+02e2			 
+02e2				; Calculate destination ptr 
+02e2 e5				push	HL 
+02e3 21 00 f0			ld		HL,VCHAR_RAM 
+02e6 dd 5e 00			ld		E,(IX+0) 
+02e9 dd 56 01			ld		D,(IX+1) 
+02ec 19				add		HL,DE 
+02ed eb				ex		DE,HL 
+02ee e1				pop		HL 
+02ef			 
+02ef				; Copy region 
+02ef cd f9 02			call 	rsa_copy 
+02f2			 
+02f2 dd e5			push	IX 
+02f4 e1				pop		HL 
+02f5 cd f1 07			call	HeapFree 
+02f8			 
+02f8				; Done! 
+02f8 c9				ret 
+02f9			 
+02f9			rsa_copy: 
+02f9 dd 46 03			ld		B,(IX+3) 
+02fc			rsa_l1: 
+02fc c5				push	BC 
+02fd d5				push	DE 
+02fe 06 00			ld		B,0				; Number of columns in BC 
+0300 dd 4e 02			ld		C,(IX+2) 
+0303 ed b0			ldir					; copy it 
+0305 d1				pop		DE 
+0306			 
+0306 e5				push	HL 
+0307 21 20 00			ld		HL,SCREEN_WIDTH 
+030a 19				add		HL,DE 
+030b eb				ex		DE,HL 
+030c e1				pop		HL 
+030d			 
+030d c1				pop		BC 
+030e			 
+030e 10 ec			djnz	rsa_l1			; Repeat B times 
+0310 c9				ret 
+0311			RESTORE_SCREEN_AREA_END: 
+0311			 
+0311			; Probably don't need this (doesn't work anyway) 
+0311			; HL = Start address 
+0311			; BC = Height/Width 
+0311			;SCROLL_SCREEN_DOWN: 
+0311			; 
+0311			;	dec		B				; Height - 1 
+0311			;	push	BC 
+0311			; 
+0311			;	; Work out width * (height-1) 
+0311			;	push	HL 
+0311			;	ld		E,C 
+0311			;	ld		H,SCREEN_WIDTH 
+0311			;	call	MUL_H_E 
+0311			;	ex		DE,HL 
+0311			;	pop		HL 
+0311			;	add		HL,DE			; DEST = origin + width * (height-1) (ie: bottom row) 
+0311			; 
+0311			;	; Work out destination ptr (DEST - SCREEN_WIDTH) 
+0311			;	push	HL 
+0311			;	ld		DE,-SCREEN_WIDTH 
+0311			;	add		HL,DE			; HL = SRC = DEST - SCREEN_WIDTH 
+0311			;	pop		DE				; DE = DEST 
+0311			; 
+0311			;	pop		BC 
+0311			; 
+0311			;ssd_loop: 
+0311			;	push	BC 
+0311			; 
+0311			;	push	HL				; Save source pointer 
+0311			;	push	HL 
+0311			; 
+0311			;	ld		B,0				; BC = area width 
+0311			;	ldir					; Move it 
+0311			; 
+0311			;	pop		HL 
+0311			;	ld		DE,-SCREEN_WIDTH 
+0311			;	add		HL,DE			; old source - SCREEN_WIDTH 
+0311			;	pop		DE				; DE = old source 
+0311			; 
+0311			;	pop		BC 
+0311			;	djnz	ssd_loop 
+0311			; 
+0311			;	ret 
+0311			 
+0311			SCROLL_SCREEN_DOWN_END: 
+0311			 
+0311			; HL = zero terminated string 
+0311			; DE = screen buffer 
+0311			; C = buffer width (will be space padded) 
+0311			PRINT_LINE: 
+0311			 
+0311				; Copy the string 
+0311			pl_loop1: 
+0311 7e				ld		A,(HL) 
+0312 b7				or		A 
+0313 28 09			jr		Z,pl_end_of_string 
+0315 12				ld		(DE),A 
+0316 23				inc		HL 
+0317 13				inc		DE 
+0318 0d				dec		C 
+0319 79				ld		A,C 
+031a b7				or		A 
+031b 20 f4			jr		nz,pl_loop1 
+031d			 
+031d				; Destination buffer full 
+031d c9				ret 
+031e			 
+031e			pl_end_of_string: 
+031e eb				ex		DE,HL 
+031f 78				ld		A,B 
+0320 41				ld		B,C 
+0321			pl_loop2: 
+0321 36 20			ld		(HL),' ' 
+0323 23				inc		HL 
+0324 10 fb			djnz	pl_loop2 
+0326 47				ld		B,A 
+0327			 
+0327 c9				ret 
+0328			 
+0328			PRINT_LINE_END: 
+0328			 
+0328			; Copy null terminated string from HL to DE 
+0328			STRCPY: 
+0328 7e				ld		A,(HL) 
+0329 12				ld		(DE),A 
+032a 23				inc		HL 
+032b 13				inc		DE 
+032c b7				or		A 
+032d 20 f9			jr		nz,STRCPY 
+032f c9				ret 
+0330			STRCPY_END: 
+0330			 
+0330			; Given a NULL terminated string in HL, find the last '.' 
+0330			; Returns found pointer in HL, or NULL if not found 
+0330			FIND_EXTENSION: 
+0330 d5				push	DE 
+0331 11 00 00			ld		DE,0				; Pointer to last found dot 
+0334			 
+0334			fe_l1: 
+0334 7e				ld		A,(HL) 
+0335 b7				or		A 
+0336 28 09			jr		z,fe_eos			; End of string? 
+0338 fe 2e			cp		'.' 
+033a 20 02			jr		nz,fe_not_a_dot 
+033c e5				push	HL					; Save position of the dot 
+033d d1				pop		DE 
+033e			 
+033e			fe_not_a_dot: 
+033e 23				inc		HL					; Next character 
+033f 18 f3			jr		fe_l1 
+0341			 
+0341			fe_eos: 
+0341 eb				ex		DE,HL				; Return the found position 
+0342 d1				pop		DE 
+0343 c9				ret 
+0344			FIND_EXTENSION_END: 
+0344			 
+0344			; Compare to strings case insensitively 
+0344			; HL = string 1 
+0344			; DE = string 2 
+0344			; Returns Z if strings match 
+0344			STRICMP: 
+0344 c5				push	BC 
+0345			sic_loop: 
+0345 7e				ld		A,(HL) 
+0346 b7				or		A 
+0347 28 11			jr		Z,sic_eos 
+0349 cd 5f 03			call	TOUPPER 
+034c 4f				ld		C,A 
+034d 1a				ld		A,(DE) 
+034e cd 5f 03			call	TOUPPER 
+0351 b9				cp		C 
+0352 20 04			jr		NZ,sic_exit 
+0354 23				inc		HL 
+0355 13				inc		DE 
+0356 18 ed			jr		sic_loop 
+0358			sic_exit: 
+0358 c1				pop		BC 
+0359 c9				ret 
+035a			sic_eos: 
+035a 4f				ld		C,A 
+035b 1a				ld		A,(DE) 
+035c b9				cp		C 
+035d 18 f9			jr		sic_exit 
+035f			STRICMP_END: 
+035f			 
+035f			 
+035f			; Make character A uppercase 
+035f			TOUPPER: 
+035f fe 61			cp      'a'             ; Nothing to do if not lower case 
+0361 d8				ret     c 
+0362 fe 7b			cp      'z' + 1         ; > 'z'? 
+0364 d0				ret     nc              ; Nothing to do, either 
+0365 e6 5f			and     0x5f            ; Convert to upper case 
+0367 c9				ret 
+0368			TOUPPER_END:
+# End of file Utils.asm
+0368			include "ScanCodeTable.asm" 
+0368			 
+0368			VK_BACKTICK: EQU 0x01 
+0368			VK_LSHIFT: EQU 0x02 
+0368			VK_RSHIFT: EQU 0x03 
+0368			VK_LCTRL: EQU 0x04 
+0368			VK_RCTRL: EQU 0x05 
+0368			VK_LMENU: EQU 0x06 
+0368			VK_RMENU: EQU 0x07 
+0368			VK_BACKSPACE: EQU 0x08 
+0368			VK_TAB: EQU 0x09 
+0368			VK_COMMA: EQU 0x0A 
+0368			VK_PERIOD: EQU 0x0B 
+0368			VK_HYPHEN: EQU 0x0C 
+0368			VK_ENTER: EQU 0x0D 
+0368			VK_SEMICOLON: EQU 0x0E 
+0368			VK_EQUALS: EQU 0x0F 
+0368			VK_ESCAPE: EQU 0x10 
+0368			VK_F1: EQU 0x11 
+0368			VK_F2: EQU 0x12 
+0368			VK_F3: EQU 0x13 
+0368			VK_F4: EQU 0x14 
+0368			VK_F5: EQU 0x15 
+0368			VK_F6: EQU 0x16 
+0368			VK_F7: EQU 0x17 
+0368			VK_F8: EQU 0x18 
+0368			VK_F9: EQU 0x19 
+0368			VK_F10: EQU 0x1a 
+0368			VK_F11: EQU 0x1b 
+0368			VK_F12: EQU 0x1c 
+0368			VK_LSQUARE: EQU 0x1d 
+0368			VK_RSQUARE: EQU 0x1e 
+0368			VK_QUOTE: EQU 0x1f 
+0368			VK_SPACE: EQU 0x20 
+0368			VK_LEFT: EQU 0x21 
+0368			VK_RIGHT: EQU 0x22 
+0368			VK_UP: EQU 0x23 
+0368			VK_DOWN: EQU 0x24 
+0368			VK_HOME: EQU 0x25 
+0368			VK_END: EQU 0x26 
+0368			VK_NEXT: EQU 0x27 
+0368			VK_PRIOR: EQU 0x28 
+0368			VK_INSERT: EQU 0x29 
+0368			VK_DELETE: EQU 0x2a 
+0368			VK_SLASH: EQU 0x2b 
+0368			; unused 2c 
+0368			; unused 2d 
+0368			; unused 2e 
+0368			; unused 2f 
+0368			; = 0x30 = = 0x39 = 0 - 9 
+0368			VK_BACKSLASH: EQU 0x3a 
+0368			VK_CAPITAL: EQU 0x3b 
+0368			VK_NUMENTER: EQU 0x3c 
+0368			; unused 3d 
+0368			; unused 3e 
+0368			; unused 3f 
+0368			; unused 40 
+0368			; = 0x41 - = 0x5A = A - Z 
+0368			VK_SUBTRACT: EQU 0x5b 
+0368			VK_MULTIPLY: EQU 0x5c 
+0368			VK_DIVIDE: EQU 0x5d 
+0368			VK_ADD: EQU 0x5e 
+0368			VK_DECIMAL: EQU 0x5F 
+0368			VK_NUM0: EQU 0x60 
+0368			VK_NUM1: EQU 0x61 
+0368			VK_NUM2: EQU 0x62 
+0368			VK_NUM3: EQU 0x63 
+0368			VK_NUM4: EQU 0x64 
+0368			VK_NUM5: EQU 0x65 
+0368			VK_NUM6: EQU 0x66 
+0368			VK_NUM7: EQU 0x67 
+0368			VK_NUM8: EQU 0x68 
+0368			VK_NUM9: EQU 0x69 
+0368			 
+0368			; This keycode table maps ps2 scan code and extended scan codes to a  
+0368			; simpler "key number".  This can then be mapped to characters using 
+0368			; the character table below 
+0368			SCANCODE_TO_VK_TABLE: 
+0368			        ; 0x0? 
+0368 00 00		        db     0,0 
+036a 19 00		        db     VK_F9,0             
+036c 00 00		        db     0,0 
+036e 15 00		        db     VK_F5,0             
+0370 13 00		        db     VK_F3,0             
+0372 11 00		        db     VK_F1,0             
+0374 12 00		        db     VK_F2,0             
+0376 1c 00		        db     VK_F12,0 
+0378 00 00		        db     0,0 
+037a 1a 00		        db     VK_F10,0            
+037c 18 00		        db     VK_F8,0             
+037e 16 00		        db     VK_F6,0             
+0380 14 00		        db     VK_F4,0             
+0382 09 00		        db     VK_TAB,0             
+0384 01 00		        db     VK_BACKTICK,0          
+0386 00 00		        db     0,0 
+0388			 
+0388			        ; 0x10 
+0388 00 00		        db     0,0 
+038a 06 07		        db     VK_LMENU,VK_RMENU      
+038c 02 00		        db     VK_LSHIFT,0  
+038e 00 00		        db     0,0 
+0390 04 05		        db     VK_LCTRL,VK_RCTRL   
+0392 .. 00		        db     'Q', 0 
+0394 .. 00		        db     '1',0        
+0396 00 00		        db     0,0 
+0398 00 00		        db     0,0 
+039a 00 00		        db     0,0 
+039c .. 00		        db     'Z', 0 
+039e .. 00		        db     'S', 0 
+03a0 .. 00		        db     'A', 0 
+03a2 .. 00		        db     'W', 0 
+03a4 .. 00		        db     '2',0        
+03a6 00 00		        db     0,0 
+03a8			 
+03a8			        ; 0x2? 
+03a8 00 00		        db     0,0 
+03aa .. 00		        db     'C', 0 
+03ac .. 00		        db     'X', 0 
+03ae .. 00		        db     'D', 0 
+03b0 .. 00		        db     'E', 0 
+03b2 .. 00		        db     '4', 0 
+03b4 .. 00		        db     '3', 0       
+03b6 00 00		        db     0,0 
+03b8 00 00		        db     0,0 
+03ba 20 00		        db     VK_SPACE, 0  
+03bc .. 00		        db     'V', 0 
+03be .. 00		        db     'F', 0 
+03c0 .. 00		        db     'T', 0 
+03c2 .. 00		        db     'R', 0 
+03c4 .. 00		        db     '5', 0 
+03c6 00 00		        db     0,0 
+03c8			 
+03c8			        ; 0x3? 
+03c8 00 00		        db     0,0 
+03ca .. 00		        db     'N', 0 
+03cc .. 00		        db     'B', 0 
+03ce .. 00		        db     'H', 0 
+03d0 .. 00		        db     'G', 0 
+03d2 .. 00		        db     'Y', 0 
+03d4 .. 00		        db     '6', 0          
+03d6 00 00		        db     0,0 
+03d8 00 00		        db     0,0 
+03da 00 00		        db     0,0 
+03dc .. 00		        db     'M', 0 
+03de .. 00		        db     'J', 0 
+03e0 .. 00		        db     'U', 0 
+03e2 .. 00		        db     '7',0           
+03e4 .. 00		        db     '8',0           
+03e6 00 00		        db     0,0 
+03e8			 
+03e8			        ; 0x4? 
+03e8 00 00		        db     0,0 
+03ea 0a 00		        db     VK_COMMA, 0     
+03ec .. 00		        db     'K', 0 
+03ee .. 00		        db     'I', 0 
+03f0 .. 00		        db     'O', 0 
+03f2 .. 00		        db     '0', 0          
+03f4 .. 00		        db     '9', 0          
+03f6 00 00		        db     0,0 
+03f8 00 00		        db     0,0 
+03fa 0b 00		        db     VK_PERIOD, 0     
+03fc 2b 5d		        db     VK_SLASH,VK_DIVIDE      
+03fe .. 00		        db     'L', 0 
+0400 0e 00		        db     VK_SEMICOLON, 0  
+0402 .. 00		        db     'P', 0 
+0404 0c 00		        db     VK_HYPHEN, 0   
+0406 00 00		        db     0, 0 
+0408			 
+0408			        ; 0x5? 
+0408 00 00		        db     0,0 
+040a 00 00		        db     0,0 
+040c 1f 00		        db     VK_QUOTE,0       
+040e 00 00		        db     0,0 
+0410 1d 00		        db     VK_LSQUARE, 0    
+0412 0f 00		        db     VK_EQUALS, 0     
+0414 00 00		        db     0,0 
+0416 00 00		        db     0,0 
+0418 3b 00		        db     VK_CAPITAL,0     
+041a 03 00		        db     VK_RSHIFT,0 
+041c 0d 3c		        db     VK_ENTER,VK_NUMENTER       
+041e 1e 00		        db     VK_RSQUARE, 0    
+0420 00 00		        db     0,0 
+0422 3a 00		        db     VK_BACKSLASH,0   
+0424 00 00		        db     0,0 
+0426 00 00		        db     0,0 
+0428			 
+0428			        ; 0x6? 
+0428 00 00		        db     0,0 
+042a 00 00		        db     0,0 
+042c 00 00		        db     0,0 
+042e 00 00		        db     0,0 
+0430 00 00		        db     0,0 
+0432 00 00		        db     0,0 
+0434 08 00		        db     VK_BACKSPACE,0   
+0436 00 00		        db     0,0 
+0438 00 00		        db     0,0 
+043a 61 26		        db     VK_NUM1,VK_END   
+043c 00 00		        db     0,0 
+043e 64 21		        db     VK_NUM4,VK_LEFT  
+0440 67 25		        db     VK_NUM7,VK_HOME  
+0442 00 00		        db     0,0 
+0444 00 00		        db     0,0 
+0446 00 00		        db     0,0 
+0448			 
+0448			        ; 0x7? 
+0448 60 29		        db     VK_NUM0,VK_INSERT    
+044a 5f 2a		        db     VK_DECIMAL,VK_DELETE 
+044c 62 24		        db     VK_NUM2,VK_DOWN     
+044e 65 00		        db     VK_NUM5,0           
+0450 66 22		        db     VK_NUM6,VK_RIGHT    
+0452 68 23		        db     VK_NUM8,VK_UP       
+0454 10 00		        db     VK_ESCAPE,0         
+0456 00 00		        db     0,0 
+0458 1b 00		        db     VK_F11,0            
+045a 5e 00		        db     VK_ADD,0               
+045c 63 27		        db     VK_NUM3,VK_NEXT        
+045e 5b 00		        db     VK_SUBTRACT,0          
+0460 5c 00		        db     VK_MULTIPLY,0          
+0462 69 28		        db     VK_NUM9,VK_PRIOR       
+0464 00 00		        db     0,0 
+0466 00 00		        db     0,0 
+0468			 
+0468			        ; 0x8? 
+0468 00 00		        db     0,0 
+046a 00 00		        db     0,0 
+046c 00 00		        db     0,0 
+046e 17 00		        db     VK_F7,0        
+0470			SCANCODE_TO_VK_TABLE_END: 
+0470			 
+0470			 
+0470			VK_TO_ASCII_TABLE: 
+0470			 
+0470 00 00		        db     0,0             ; null 
+0472 .. 7e		        db     '`', '~'        ; VK_BACKTICK     0x01 
+0474 00 00		        db     0,0             ; VK_LSHIFT       0x02 
+0476 00 00		        db     0,0             ; VK_RSHIFT       0x03 
+0478 00 00		        db     0,0             ; VK_LCTRL        0x04 
+047a 00 00		        db     0,0             ; VK_RCTRL        0x05 
+047c 00 00		        db     0,0             ; VK_LMENU        0x06 
+047e 00 00		        db     0,0             ; VK_RMENU        0x07 
+0480 08 08		        db     8,8             ; VK_BACKSPACE    0x08 
+0482 09 09		        db     9,9             ; VK_TAB          0x09 
+0484 .. ..		        db     ',','<'         ; VK_COMMA        0x0A 
+0486 .. ..		        db     '.','>'         ; VK_PERIOD       0x0B 
+0488 .. ..		        db     '-','_'         ; VK_HYPHEN       0x0C 
+048a 0a 0a		        db     0x0A,0x0A       ; VK_ENTER        0x0D 
+048c .. ..		        db     ';',':'         ; VK_SEMICOLON    0x0E 
+048e .. ..		        db     '=','+'         ; VK_EQUALS       0x0F 
+0490 00 00		        db     0,0             ; VK_ESCAPE       0x10 
+0492 00 00		        db     0,0             ; VK_F1           0x11 
+0494 00 00		        db     0,0             ; VK_F2           0x12 
+0496 00 00		        db     0,0             ; VK_F3           0x13 
+0498 00 00		        db     0,0             ; VK_F4           0x14 
+049a 00 00		        db     0,0             ; VK_F5           0x15 
+049c 00 00		        db     0,0             ; VK_F6           0x16 
+049e 00 00		        db     0,0             ; VK_F7           0x17 
+04a0 00 00		        db     0,0             ; VK_F8           0x18 
+04a2 00 00		        db     0,0             ; VK_F9           0x19 
+04a4 00 00		        db     0,0             ; VK_F10          0x1a 
+04a6 00 00		        db     0,0             ; VK_F11          0x1b 
+04a8 00 00		        db     0,0             ; VK_F12          0x1c 
+04aa .. 7b		        db     '[', '{'        ; VK_LSQUARE      0x1d 
+04ac .. 7d		        db     ']', '}'        ; VK_RSQUARE      0x1e 
+04ae 27 22		        db     0x27, '"'       ; VK_QUOTE        0x1f 
+04b0 .. 20		        db     ' ', ' '        ; VK_SPACE        0x20 
+04b2 00 00		        db     0,0             ; VK_LEFT         0x21 
+04b4 00 00		        db     0,0             ; VK_RIGHT        0x22 
+04b6 00 00		        db     0,0             ; VK_UP           0x23 
+04b8 00 00		        db     0,0             ; VK_DOWN         0x24 
+04ba 00 00		        db     0,0             ; VK_HOME         0x25 
+04bc 00 00		        db     0,0             ; VK_END          0x26 
+04be 00 00		        db     0,0             ; VK_NEXT         0x27 
+04c0 00 00		        db     0,0             ; VK_PRIOR        0x28 
+04c2 00 00		        db     0,0             ; VK_INSERT       0x29 
+04c4 00 00		        db     0,0             ; VK_DELETE       0x2a 
+04c6 .. ..		        db     '/','?'         ; VK_SLASH        0x2b 
+04c8 00 00		        db     0,0             ; unused          0x2c 
+04ca 00 00		        db     0,0             ; unused          0x2d 
+04cc 00 00		        db     0,0             ; unused          0x2e 
+04ce 00 00		        db     0,0             ; unusued         0x2f 
+04d0 .. ..		        db     '0',')' 
+04d2 .. ..		        db     '1','!' 
+04d4 .. ..		        db     '2','@' 
+04d6 .. ..		        db     '3','#' 
+04d8 .. ..		        db     '4','$' 
+04da .. ..		        db     '5','%' 
+04dc .. ..		        db     '6','^' 
+04de .. ..		        db     '7','&' 
+04e0 .. ..		        db     '8','*' 
+04e2 .. ..		        db     '9','(' 
+04e4 5c ..		        db     0x5c,'|'        ; VK_BACKSLASH    0x3a 
+04e6 00 00		        db     0,0             ; VK_CAPITAL      0x3b 
+04e8 0d 0d		        db     0x0d,0x0d       ; VK_NUMENTER     0x3c 
+04ea 00 00		        db     0,0             ;  unused 3d 
+04ec 00 00		        db     0,0             ;  unused 3e 
+04ee 00 00		        db     0,0             ;  unused 3f 
+04f0 00 00		        db     0,0             ;  unused 40 
+04f2 .. ..		        db     'a','A' 
+04f4 .. ..		        db     'b','B' 
+04f6 .. ..		        db     'c','C' 
+04f8 .. ..		        db     'd','D' 
+04fa .. ..		        db     'e','E' 
+04fc .. ..		        db     'f','F' 
+04fe .. ..		        db     'g','G' 
+0500 .. ..		        db     'h','H' 
+0502 .. ..		        db     'i','I' 
+0504 .. ..		        db     'j','J' 
+0506 .. ..		        db     'k','K' 
+0508 .. ..		        db     'l','L' 
+050a .. ..		        db     'm','M' 
+050c .. ..		        db     'n','N' 
+050e .. ..		        db     'o','O' 
+0510 .. ..		        db     'p','P' 
+0512 .. ..		        db     'q','Q' 
+0514 .. ..		        db     'r','R' 
+0516 .. ..		        db     's','S' 
+0518 .. ..		        db     't','T' 
+051a .. ..		        db     'u','U' 
+051c .. ..		        db     'v','V' 
+051e .. ..		        db     'w','W' 
+0520 .. ..		        db     'x','X' 
+0522 .. ..		        db     'y','Y' 
+0524 .. ..		        db     'z','Z' 
+0526 .. ..		        db     '-','-'         ; VK_SUBTRACT     0x5b 
+0528 .. ..		        db     '*','*'         ; VK_MULTIPLY     0x5c 
+052a .. ..		        db     '/','/'         ; VK_DIVIDE       0x5d 
+052c .. ..		        db     '+','+'         ; VK_ADD          0x5e 
+052e .. ..		        db     '.','.'         ; VK_DECIMAL      0x5F 
+0530 .. ..		        db     '0','0'         ; VK_NUM0         0x60 
+0532 .. ..		        db     '1','1'         ; VK_NUM1         0x61 
+0534 .. ..		        db     '2','2'         ; VK_NUM2         0x62 
+0536 .. ..		        db     '3','3'         ; VK_NUM3         0x63 
+0538 .. ..		        db     '4','4'         ; VK_NUM4         0x64 
+053a .. ..		        db     '5','5'         ; VK_NUM5         0x65 
+053c .. ..		        db     '6','6'         ; VK_NUM6         0x66 
+053e .. ..		        db     '7','7'         ; VK_NUM7         0x67 
+0540 .. ..		        db     '8','8'         ; VK_NUM8         0x68 
+0542 .. ..		        db     '9','9'         ; VK_NUM9         0x69 
+0544			VK_TO_ASCII_TABLE_END:
+# End of file ScanCodeTable.asm
+0544			include "ListBox.asm" 
+0544			; Displays a list box/menu 
+0544			; On entry: 
+0544			;   PUSH ppStrings : (char**) to null terminated list of null terminated strings 
+0544			;   PUSH pOrigin   : origin on screen to display the list 
+0544			;   PUSH size	   : width in lobyte, height in hibyte 
+0544			;   PUSH selection : zero based index of initial selection, 0xFFFF if none 
+0544			;   PUSH colors    : normal color in lobyte, selected color in hibyte 
+0544			;   PUSH callback  : callback to back called when return/esc pressed (HL=selected string pointer, DE=selected index) 
+0544			; On exit: 
+0544			;   DE             : zero based index of selection.  Z if selected, NZ if cancelled 
+0544			 
+0544			LB_LOCAL_SPACE:		EQU		4 
+0544			LB_STRINGS:			EQU		LB_LOCAL_SPACE + 12 
+0544			LB_ORIGIN:  		EQU		LB_LOCAL_SPACE + 10 
+0544			LB_SIZE:  			EQU		LB_LOCAL_SPACE + 8 
+0544			LB_SEL:				EQU		LB_LOCAL_SPACE + 6 
+0544			LB_COLORS:			EQU		LB_LOCAL_SPACE + 4 
+0544			LB_CALLBACK:		EQU		LB_LOCAL_SPACE + 2 
+0544			LB_TOP:				EQU		LB_LOCAL_SPACE - 2 
+0544			LB_COUNT:			EQU		LB_LOCAL_SPACE - 4 
+0544			 
+0544			LISTBOX: 
+0544				; Setup stack frame 
+0544 fd 21 fc ff		ld		IY,-LB_LOCAL_SPACE 
+0548 fd 39			add		IY,SP 
+054a fd f9			ld		SP,IY 
+054c			 
+054c				; Count how many items 
+054c fd 6e 10			ld		L,(IY+LB_STRINGS) 
+054f fd 66 11			ld		H,(IY+LB_STRINGS+1) 
+0552 01 00 00			ld		BC,0 
+0555			lb_count_loop: 
+0555 7e				ld		A,(HL) 
+0556 b6				or		(HL) 
+0557 28 05			jr		Z,lb_counted 
+0559 03				inc		BC 
+055a 23				inc		HL 
+055b 23				inc		HL 
+055c 18 f7			jr		lb_count_loop 
+055e			lb_counted: 
+055e fd 71 00			ld		(IY+LB_COUNT),C 
+0561 fd 70 01			ld		(IY+LB_COUNT+1),B 
+0564			 
+0564				; Setup top index 
+0564 af				xor		A 
+0565 fd 77 02			ld		(IY+LB_TOP),A 
+0568 fd 77 03			ld		(IY+LB_TOP+1),A 
+056b			 
+056b				; Setup colors for this area of the screen 
+056b fd 4e 0c			ld		C,(IY+LB_SIZE) 
+056e fd 46 0d			ld		B,(IY+LB_SIZE+1) 
+0571 fd 6e 0e			ld		L,(IY+LB_ORIGIN) 
+0574 fd 66 0f			ld		H,(IY+LB_ORIGIN+1) 
+0577 fd 7e 08			ld		A,(IY+LB_COLORS) 
+057a 11 00 f2			ld		DE,COLOR_RAM 
+057d 19				add		HL,DE 
+057e				COLOR_RAM_IN 
+057e				endm 
+# End of macro COLOR_RAM_IN
+057e cd 5c 02			call	CLEAR_SCREEN_AREA 
+0581				COLOR_RAM_OUT 
+0581				endm 
+# End of macro COLOR_RAM_OUT
+0581			 
+0581			lb_main_loop: 
+0581				; Check top/sel indicies 
+0581 cd 80 06			call	lb_check_sel_range 
+0584 cd ae 06			call	lb_check_sel_visible 
+0587 cd e6 06			call	lb_check_top_range 
+058a			 
+058a				; Paint the screen 
+058a cd 14 07			call	lb_paint 
+058d			 
+058d fd 7e 09			ld		A,(IY+LB_COLORS+1) 
+0590 cd e7 06			call	lb_paint_sel 
+0593			 
+0593				; Wait for a key 
+0593 cd 3b 01			call	READ_KEY 
+0596			 
+0596 f5				push	AF 
+0597 fd 7e 08			ld		A,(IY+LB_COLORS) 
+059a cd e7 06			call	lb_paint_sel 
+059d f1				pop		AF 
+059e			 
+059e fd 5e 0a			ld		E,(IY+LB_SEL) 
+05a1 fd 56 0b			ld		D,(IY+LB_SEL+1) 
+05a4			 
+05a4 fe 4f			cp		'O' 
+05a6 20 03			jr		NZ,$+5 
+05a8 c3 4a 06			jp		lb_enter 
+05ab			 
+05ab fe 23			cp		VK_UP 
+05ad 28 60			jr		z,lb_up 
+05af fe 24			cp		VK_DOWN 
+05b1 28 62			jr		z,lb_down 
+05b3 fe 0d			cp		VK_ENTER 
+05b5 20 03			jr		nz,$+5 
+05b7 c3 4a 06			jp		lb_enter 
+05ba fe 10			cp		VK_ESCAPE 
+05bc 28 12			jr		z,lb_escape 
+05be			if DEBUG 
+05be				cp		'H' 
+05be				jr		Z,lb_home 
+05be				cp		'E' 
+05be				jr		z,lb_end 
+05be				cp		'N' 
+05be				jr		z,lb_pagedown 
+05be				cp		'P' 
+05be				jr		z,lb_pageup 
+05be			else 
+05be fe 25			cp		VK_HOME 
+05c0 28 59			jr		Z,lb_home 
+05c2 fe 26			cp		VK_END 
+05c4 28 5d			jr		z,lb_end 
+05c6 fe 27			cp		VK_NEXT 
+05c8 28 65			jr		z,lb_pagedown 
+05ca fe 28			cp		VK_PRIOR 
+05cc 28 6d			jr		z,lb_pageup 
+05ce			endif 
+05ce 18 b1			jr		lb_main_loop 
+05d0			 
+05d0			lb_escape: 
+05d0 1e ff			ld		E,0xFF 
+05d2 53				ld		D,E 
+05d3 c3 4a 06			jp		lb_enter 
+05d6			 
+05d6			lb_move_sel: 
+05d6				; DE should be new selection; 
+05d6				; BC should be which direction to go it lands on a separator 
+05d6 7a				ld		A,D 
+05d7 e6 80			and		80h 
+05d9 28 03			jr		z,lb_sel_is_positive 
+05db 11 00 00			ld		DE,0 
+05de			lb_sel_is_positive: 
+05de fd 6e 00			ld		L,(IY+LB_COUNT) 
+05e1 fd 66 01			ld		H,(IY+LB_COUNT+1) 
+05e4 b7				or		A 
+05e5 ed 52			sbc		HL,DE 
+05e7 30 07			jr		nc,lb_sel_is_less_than_count 
+05e9 fd 5e 00			ld		E,(IY+LB_COUNT) 
+05ec fd 56 01			ld		D,(IY+LB_COUNT+1) 
+05ef 1b				dec		DE 
+05f0			 
+05f0			lb_sel_is_less_than_count: 
+05f0 fd 6e 10			ld		L,(IY+LB_STRINGS) 
+05f3 fd 66 11			ld		H,(IY+LB_STRINGS+1) 
+05f6 19				add		HL,DE 
+05f7 19				add		HL,DE 
+05f8 d5				push	DE 
+05f9 5e				ld		E,(HL) 
+05fa 23				inc		HL 
+05fb 56				ld		D,(HL) 
+05fc eb				ex		DE,HL 
+05fd d1				pop		DE 
+05fe			 
+05fe 7e				ld		A,(HL) 
+05ff fe 2d			cp		'-' 
+0601 20 03			jr		nz,lb_not_a_sep 
+0603 eb				ex		DE,HL 
+0604 09				add		HL,BC 
+0605 eb				ex		DE,HL 
+0606			 
+0606			lb_not_a_sep: 
+0606 fd 73 0a			ld		(IY+LB_SEL),E 
+0609 fd 72 0b			ld		(IY+LB_SEL+1),D 
+060c c3 81 05			jp		lb_main_loop 
+060f			 
+060f			lb_up: 
+060f 1b				dec		DE 
+0610 01 ff ff			ld		BC,-1 
+0613 18 c1			jr		lb_move_sel 
+0615			 
+0615			lb_down: 
+0615 13				inc		DE 
+0616 01 01 00			ld		BC,1 
+0619 18 bb			jr		lb_move_sel 
+061b			 
+061b			lb_home: 
+061b 11 00 00			ld		DE,0 
+061e 01 01 00			ld		BC,1 
+0621 18 b3			jr		lb_move_sel 
+0623			 
+0623			lb_end: 
+0623 fd 5e 00			ld		E,(IY+LB_COUNT) 
+0626 fd 56 01			ld		D,(IY+LB_COUNT+1) 
+0629 1b				dec		DE 
+062a 01 ff ff			ld		BC,-1 
+062d 18 a7			jr		lb_move_sel 
+062f			 
+062f			lb_pagedown: 
+062f fd 6e 0d			ld		L,(IY+LB_SIZE+1) 
+0632 26 00			ld		H,0 
+0634 19				add		HL,DE 
+0635 eb				ex		DE,HL 
+0636 01 01 00			ld		BC,1 
+0639 18 9b			jr		lb_move_sel 
+063b			 
+063b			lb_pageup: 
+063b fd 6e 0d			ld		L,(IY+LB_SIZE+1) 
+063e 26 00			ld		H,0 
+0640 eb				ex		DE,HL 
+0641 b7				or		A 
+0642 ed 52			sbc		HL,De 
+0644 eb				ex		DE,HL 
+0645 01 ff ff			ld		BC,-1 
+0648 18 8c			jr		lb_move_sel 
+064a			 
+064a			lb_enter: 
+064a				; Setup IX = callback 
+064a fd 6e 06			ld		L,(IY+LB_CALLBACK)	 
+064d fd 66 07			ld		H,(IY+LB_CALLBACK+1) 
+0650 7d				ld		A,L 
+0651 b4				or		H 
+0652 28 21			jr		z,lb_return 
+0654 e5				push	HL 
+0655 dd e1			pop		IX 
+0657			 
+0657				; Setup HL = selected string pointer (or NULL if negative sel) 
+0657 7a				ld		A,D 
+0658 e6 80			and		80h 
+065a 28 05			jr		z,lb_get_string_pointer 
+065c 21 00 00			ld		HL,0 
+065f 18 08			jr		lb_cont 
+0661			lb_get_string_pointer: 
+0661 fd 6e 10			ld		L,(IY+LB_STRINGS)	 
+0664 fd 66 11			ld		H,(IY+LB_STRINGS+1) 
+0667 19				add		HL,DE 
+0668 19				add		HL,DE 
+0669			lb_cont: 
+0669			 
+0669				; Leave DE = selected index 
+0669			 
+0669				; Call callback 
+0669 fd e5			push	IY 
+066b cd 7e 06			call	__call_indirect_ix 
+066e fd e1			pop		IY 
+0670 28 03			jr		z,lb_return 
+0672 c3 81 05			jp		lb_main_loop 
+0675			 
+0675			 
+0675			lb_return: 
+0675				; Clean up local stack frame 
+0675 fd 21 04 00		ld		IY,LB_LOCAL_SPACE 
+0679 fd 39			add		IY,SP 
+067b fd f9			ld		SP,IY 
+067d c9				ret 
+067e			 
+067e			__call_indirect_ix: 
+067e dd e9			jp 		(ix) 
+0680			 
+0680			lb_check_sel_range: 
+0680 fd 6e 0a			ld		L,(IY+LB_SEL) 
+0683 fd 66 0b			ld		H,(IY+LB_SEL+1) 
+0686 7c				ld		A,H 
+0687 e6 80			and		80h			; Is the selection negative? 
+0689 28 09			jr		Z,lb_sel_not_negative 
+068b fd 36 0a 00		ld		(IY+LB_SEL),0 
+068f fd 36 0b 00		ld		(IY+LB_SEL+1),0 
+0693 c9				ret 
+0694			lb_sel_not_negative: 
+0694 eb				ex		DE,HL		; DE = selection 
+0695 fd 6e 00			ld		L,(IY+LB_COUNT)	 
+0698 fd 66 01			ld		H,(IY+LB_COUNT+1) 
+069b 2b				dec		HL			; HL = count - 1 
+069c b7				or		A			; clear carry 
+069d ed 52			sbc		HL,DE		; Compare 
+069f d0				ret		nc			; within range 
+06a0			 
+06a0				; selection is past the end, clamp to count-1 
+06a0 fd 6e 00			ld		L,(IY+LB_COUNT)	 
+06a3 fd 66 01			ld		H,(IY+LB_COUNT+1) 
+06a6 2b				dec		HL			; HL = count - 1 
+06a7 fd 75 0a			ld		(IY+LB_SEL),L	 
+06aa fd 74 0b			ld		(IY+LB_SEL+1),H 
+06ad			 
+06ad c9				ret 
+06ae			 
+06ae			lb_check_sel_visible: 
+06ae fd 6e 0a			ld		L,(IY+LB_SEL) 
+06b1 fd 66 0b			ld		H,(IY+LB_SEL+1) 
+06b4 fd 5e 02			ld		E,(IY+LB_TOP) 
+06b7 fd 56 03			ld		D,(IY+LB_TOP+1) 
+06ba e5				push	HL 
+06bb d5				push	DE 
+06bc b7				or		A			; clear carry 
+06bd ed 52			sbc		HL,DE 
+06bf d1				pop		DE 
+06c0 e1				pop		HL 
+06c1 30 07			jr		nc,lb_sel_not_off_top 
+06c3			 
+06c3				; Select is off the top, set top to selection 
+06c3 fd 75 02			ld		(IY+LB_TOP),L 
+06c6 fd 74 03			ld		(IY+LB_TOP+1),H 
+06c9 c9				ret 
+06ca			 
+06ca			lb_sel_not_off_top: 
+06ca fd 4e 0d			ld		C,(IY+LB_SIZE+1) 
+06cd 06 00			ld		B,0 
+06cf 0d				dec		C 
+06d0 eb				ex		DE,HL 
+06d1 09				add		HL,BC 
+06d2 eb				ex		DE,HL		; DE is now the index of the last visible item, HL is the current sel 
+06d3			 
+06d3 b7				or		A			; clear carry 
+06d4 ed 52			sbc		HL,DE 
+06d6 d8				ret		C 
+06d7 c8				ret		Z 
+06d8			 
+06d8 fd 5e 02			ld		E,(IY+LB_TOP) 
+06db fd 56 03			ld		D,(IY+LB_TOP+1) 
+06de 19				add		HL,De 
+06df fd 75 02			ld		(IY+LB_TOP),L 
+06e2 fd 74 03			ld		(IY+LB_TOP+1),H 
+06e5 c9				ret 
+06e6			 
+06e6			 
+06e6			lb_check_top_range: 
+06e6 c9				ret 
+06e7			 
+06e7			lb_paint_sel: 
+06e7				; Work out number of lines from top  
+06e7 fd 6e 0a			ld		L,(IY+LB_SEL) 
+06ea fd 66 0b			ld		H,(IY+LB_SEL+1) 
+06ed fd 5e 02			ld		E,(IY+LB_TOP) 
+06f0 fd 56 03			ld		D,(IY+LB_TOP+1) 
+06f3 b7				or		A 
+06f4 ed 52			sbc		HL,DE 
+06f6			 
+06f6				; Work out offset to selected line 
+06f6 5d				ld		E,L 
+06f7 26 20			ld		H,SCREEN_WIDTH 
+06f9 cd 3e 02			call	MUL_H_E 
+06fc 11 00 f2			ld		DE,COLOR_RAM 
+06ff 19				add		HL,DE				 
+0700 fd 5e 0e			ld		E,(IY+LB_ORIGIN) 
+0703 fd 56 0f			ld		D,(IY+LB_ORIGIN+1) 
+0706 19				add		HL,DE				; HL = color buf pointed for selected line 
+0707 e5				push	HL 
+0708 d1				pop		DE 
+0709 13				inc		DE 
+070a			 
+070a 06 00			ld		B,0 
+070c fd 4e 0c			ld		C,(IY+LB_SIZE)		 
+070f 0d				dec		C					; Width of listbox 
+0710			 
+0710				; Fill color buffer 
+0710				COLOR_RAM_IN 
+0710				endm 
+# End of macro COLOR_RAM_IN
+0710 77				ld		(HL),A 
+0711 ed b0			ldir 
+0713				COLOR_RAM_OUT 
+0713				endm 
+# End of macro COLOR_RAM_OUT
+0713 c9				ret 
+0714			 
+0714			 
+0714			lb_paint: 
+0714				; Print the menu 
+0714 21 00 f0			ld		HL,VCHAR_RAM 
+0717 fd 5e 0e			ld		E,(IY+LB_ORIGIN) 
+071a fd 56 0f			ld		D,(IY+LB_ORIGIN+1) 
+071d 19				add		HL,DE 
+071e eb				ex		DE,HL		; DE = screen pointer 
+071f fd 6e 10			ld		L,(IY+LB_STRINGS) 
+0722 fd 66 11			ld		H,(IY+LB_STRINGS+1)	 
+0725 fd 4e 02			ld		C,(IY+LB_TOP)	; Top index 
+0728 fd 46 03			ld		B,(IY+LB_TOP+1) 
+072b 09				add		HL,BC		; Add to source strings array pointer 
+072c 09				add		HL,BC 
+072d e5				push	HL 
+072e dd e1			pop		IX			; IX = strings array pointer 
+0730			 
+0730 fd 46 0d			ld		B,(IY+LB_SIZE+1) 
+0733			paint_loop: 
+0733 dd 6e 00			ld		L,(IX+0) 
+0736 dd 66 01			ld		H,(IX+1)	; HL = string pointer 
+0739 7d				ld		A,L 
+073a b4				or		H 
+073b 28 18			jr		Z,paint_loop_not_enough_strings 
+073d			 
+073d 7e				ld		A,(HL) 
+073e fe 2d			cp 		'-'			; Separator? 
+0740 20 1a			jr		nz,paint_loop_not_a_sep 
+0742			 
+0742 d5				push	DE 
+0743 d5				push	DE 
+0744 e1				pop		HL 
+0745 13				inc		DE 
+0746 c5				push	BC 
+0747 fd 4e 0c			ld		C,(IY+LB_SIZE) 
+074a 0d				dec		C 
+074b 06 00			ld		B,0 
+074d 36 01			ld		(HL),BOX_H 
+074f ed b0			ldir 
+0751 c1				pop		BC 
+0752 d1				pop		DE 
+0753 18 0f			jr		paint_loop_cont 
+0755			 
+0755			paint_loop_not_enough_strings: 
+0755 21 70 07			ld		HL,NULL_STRING 
+0758 dd 2b			dec		IX			; Stop IX from incrementing 
+075a dd 2b			dec		IX 
+075c			 
+075c			paint_loop_not_a_sep: 
+075c d5				push	DE 
+075d fd 4e 0c			ld		C,(IY+LB_SIZE) 
+0760 cd 11 03			call	PRINT_LINE 
+0763 d1				pop		DE 
+0764			 
+0764			paint_loop_cont: 
+0764 21 20 00			ld		HL,SCREEN_WIDTH 
+0767 19				add		HL,DE 
+0768 eb				ex		DE,HL		; DE = next line 
+0769			 
+0769 dd 23			inc		IX 
+076b dd 23			inc		IX			; IX = next string 
+076d 10 c4			djnz	paint_loop 
+076f			paint_loop_finished: 
+076f			 
+076f				; Done! 
+076f c9				ret 
+0770			 
+0770			NULL_STRING: 
+0770 00				db		0 
+0771			 
+0771			END_LISTBOX: 
+0771			 
+0771			 
+# End of file ListBox.asm
+0771			include "Heap.asm" 
+0771			; This is a _really_ simple heap manager, designed to work well enough for FPGABee's PCU 
+0771			; Note the following: 
+0771			;   - free blocks aren't split for smaller allocations - the first one that's big enough is 
+0771			;      used 
+0771			;   - free blocks aren't coalesced 
+0771			;   - freeing the highest block will drop the hi-water mark. 
+0771			; In other words: 
+0771			;   - try to free blocks in the reverse order they're allocated 
+0771			;   - try to allocate permanent/long living allocations first. 
+0771			 
+0771			; Initialize the heap 
+0771			HeapInit: 
+0771 21 00 00			ld		HL,0 
+0774 22 00 42			ld		(HEAP_FREE_CHAIN),HL 
+0777 21 e2 42			ld		HL,HEAP_BASE_ADDRESS 
+077a 22 02 42			ld		(HEAP_HI_WATER),HL 
+077d c9				ret 
+077e			HeapInitEnd: 
+077e			 
+077e			 
+077e			; On entry 
+077e			; 	BC = number of bytes 
+077e			; On return 
+077e			; 	HL = pointer 
+077e			HeapAlloc: 
+077e dd 21 00 00		ld		IX,0 
+0782 dd 39			add		IX,SP 
+0784			 
+0784				; BC must allocate at least 2 bytes 
+0784 3e 00			ld		a,0 
+0786 b0				or		b 
+0787 20 07			jr		nz,ha_big_enough 
+0789 79				ld		a,c 
+078a fe 02			cp		2 
+078c 30 02			jr		nc,ha_big_enough 
+078e 0e 02			ld		c,2 
+0790			ha_big_enough: 
+0790			 
+0790				; Previous chain pointer 
+0790 dd 36 f6 00		ld		(IX-10),0 
+0794 dd 36 f7 00		ld		(IX-9),0 
+0798			 
+0798				; Anything in the free chain? 
+0798 2a 00 42			ld		HL,(HEAP_FREE_CHAIN) 
+079b			 
+079b			heap_alloc_l1: 
+079b 7c				ld		A,H 
+079c b5				or		L 
+079d 28 31			jr		Z,no_free_blocks 
+079f			 
+079f				; Get the size of this free block 
+079f 5e				ld		E,(HL) 
+07a0 23				inc		HL 
+07a1 56				ld		D,(HL) 
+07a2 23				inc		HL 
+07a3			 
+07a3				; Is it big enough? 
+07a3 7b				ld		A,E 
+07a4 91				sub		C 
+07a5 7a				ld		A,D 
+07a6 98				sbc		A,B 
+07a7 30 0d			jr		nc,found_free_block 
+07a9			 
+07a9				; Save previous pointer 
+07a9 dd 75 f6			ld		(IX-10),L 
+07ac dd 74 f7			ld		(IX-9),H 
+07af			 
+07af				; Follow chain 
+07af 5e				ld		E,(HL) 
+07b0 23				inc		HL 
+07b1 56				ld		D,(HL) 
+07b2 23				inc		HL 
+07b3 eb				ex		DE,HL 
+07b4 18 e5			jr		heap_alloc_l1 
+07b6			 
+07b6			found_free_block: 
+07b6				; Save pointer to the memory block 
+07b6 e5				push	HL			 
+07b7			 
+07b7				; Unlink this block 
+07b7			 
+07b7				; Get address to next memory block 
+07b7 5e				ld		E,(HL)		 
+07b8 23				inc		HL 
+07b9 56				ld		D,(HL) 
+07ba 23				inc		HL			; DE = pointer to next 
+07bb			 
+07bb				; Get address of previous memory block 
+07bb dd 6e f6			ld		L,(IX-10) 
+07be dd 66 f7			ld		H,(IX-9) 
+07c1 7d				ld		A,L 
+07c2 b4				or		H 
+07c3 28 05			jr		Z,ffb_1 
+07c5 73				ld		(HL),E 
+07c6 23				inc		HL 
+07c7 72				ld		(HL),D 
+07c8 18 04			jr		ffb_2 
+07ca			 
+07ca			ffb_1: 
+07ca				; Freed block is first in chain, update head pointer 
+07ca eb				ex		DE,HL 
+07cb 22 00 42			ld		(HEAP_FREE_CHAIN),HL 
+07ce			 
+07ce			ffb_2: 
+07ce				; Restore block pointer 
+07ce e1				pop		HL			 
+07cf			 
+07cf				; Split block? 
+07cf			 
+07cf c9				ret 
+07d0			 
+07d0			no_free_blocks: 
+07d0				; Check have room in heap 
+07d0 2a 02 42			ld		HL,(HEAP_HI_WATER) 
+07d3 09				add		HL,BC 
+07d4 23				inc		HL 
+07d5 23				inc		HL 
+07d6 11 e2 7a			ld		DE,HEAP_BASE_ADDRESS + HEAP_SIZE 
+07d9			 
+07d9				; Compare HL > DE 
+07d9 7b				ld		A,E 
+07da 95				sub		L 
+07db 7a				ld		A,D 
+07dc 9c				sbc		A,H 
+07dd 38 0e			jr		c,out_of_memory 
+07df			 
+07df				; Have room, adjust hi-water 
+07df 2a 02 42			ld		HL,(HEAP_HI_WATER) 
+07e2 71				ld		(HL),C 
+07e3 23				inc		HL 
+07e4 70				ld		(HL),B 
+07e5 23				inc		HL 
+07e6 e5				push	HL 
+07e7 09				add		HL,BC 
+07e8 22 02 42			ld		(HEAP_HI_WATER),HL 
+07eb e1				pop		HL 
+07ec c9				ret 
+07ed			 
+07ed			out_of_memory: 
+07ed 21 00 00			ld		HL,0 
+07f0 c9				ret 
+07f1			 
+07f1			HeapAllocEnd: 
+07f1			 
+07f1			; On Entry 
+07f1			; 	HL = pointer 
+07f1			HeapFree: 
+07f1			 
+07f1				; Get the size of the allocated block 
+07f1 2b				dec		HL 
+07f2 46				ld		B,(HL) 
+07f3 2b				dec		HL 
+07f4 4e				ld		C,(HL)		; BC = size of block 
+07f5			 
+07f5				; Is it the highest allocated block? 
+07f5 e5				push	HL 
+07f6 09				add		HL,BC 
+07f7 23				inc		HL 
+07f8 23				inc		HL			; end of allocated block 
+07f9 eb				ex		DE,HL		 
+07fa 2a 02 42			ld		HL,(HEAP_HI_WATER) 
+07fd 7a				ld		A,D 
+07fe bc				cp		H 
+07ff 20 09			jr		NZ,add_to_free_chain 
+0801 7b				ld		A,E 
+0802 bd				cp		L 
+0803 20 05			jr		NZ,add_to_free_chain 
+0805			 
+0805				; Lower heap hi-water 
+0805 e1				pop		HL 
+0806 22 02 42			ld		(HEAP_HI_WATER),HL 
+0809 c9				ret 
+080a			 
+080a			add_to_free_chain: 
+080a e1				pop		HL 
+080b ed 5b 00 42		ld		DE,(HEAP_FREE_CHAIN) 
+080f 22 00 42			ld		(HEAP_FREE_CHAIN),HL 
+0812 23				inc		HL 
+0813 23				inc		HL 
+0814 73				ld		(HL),E 
+0815 23				inc		HL 
+0816 72				ld		(HL),D 
+0817 c9				ret 
+0818			 
+0818			HeapFreeEnd:
+# End of file Heap.asm
+0818			include "ChooseFile.asm" 
+0818			CF_LOCAL_SPACE:		EQU	12 
+0818			CF_STRINGS:			EQU CF_LOCAL_SPACE-2 
+0818			CF_SAVE_SCREEN:		EQU CF_LOCAL_SPACE-4 
+0818			CF_FILTER:			EQU CF_LOCAL_SPACE-6 
+0818			CF_CURR_FILE:		EQU	CF_LOCAL_SPACE-8 
+0818			CF_SEL_INDEX:		EQU	CF_LOCAL_SPACE-10 
+0818			CF_CAN_EJECT:		EQU	CF_LOCAL_SPACE-12 
+0818			 
+0818			 
+0818			CHOOSE_FILE_ORIGIN:	EQU	0x0042 
+0818			CHOOSE_FILE_SIZE:	EQU	0x0C1C 
+0818			 
+0818 .. 00		CF_STR_NONE:		DB "<eject>",0 
+0820			 
+0820			; Choose a file  
+0820			; 	DE = filter string 
+0820			; 	HL = dir id of the currently selected image 
+0820			; 	A = 1 to include an option for "eject" 
+0820			; Returns DE = directory number of selected image 
+0820			;            = 0xFFFF (-1) if cancelled 
+0820			;            = 0xFFFE (-2) if selected <eject> 
+0820			CHOOSE_FILE: 
+0820			 
+0820				; Setup stack frame 
+0820 fd 21 f4 ff		ld		IY,-CF_LOCAL_SPACE 
+0824 fd 39			add		IY,SP 
+0826 fd f9			ld		SP,IY 
+0828			 
+0828 fd 77 00			ld		(IY+CF_CAN_EJECT),A 
+082b			 
+082b				; Save the filter string 
+082b fd 73 06			ld		(IY+CF_FILTER),E 
+082e fd 72 07			ld		(IY+CF_FILTER+1),D 
+0831			 
+0831				; Set the default initial selection to -1 
+0831 3e ff			ld		A,0xFF 
+0833 fd 77 02			ld		(IY+CF_SEL_INDEX),A 
+0836 fd 77 03			ld		(IY+CF_SEL_INDEX+1),A 
+0839			 
+0839				; Convert the currently selected directory index to  
+0839				; a pointer to the filename for that directory entry 
+0839 7c				ld		A,H 
+083a e6 80			and		0x80 
+083c 20 0e			jr		nz,cf_no_prev_sel 
+083e 29				add		HL,HL		;*2 
+083f 29				add		HL,HL		;*4 
+0840 29				add		HL,HL		;*8 
+0841 29				add		HL,HL		;*16 
+0842 29				add		HL,HL		;*32 
+0843 eb				ex		DE,HL 
+0844 2a 26 42			ld		HL,(PTR_DIRECTORY) 
+0847 19				add		HL,DE 
+0848 11 0a 00			ld		DE,DIR_FILENAME 
+084b 19				add		HL,DE 
+084c			cf_no_prev_sel: 
+084c fd 75 04			ld		(IY+CF_CURR_FILE),L 
+084f fd 74 05			ld		(IY+CF_CURR_FILE+1),H 
+0852			 
+0852				; Save the screen area 
+0852 21 42 00			ld		HL,CHOOSE_FILE_ORIGIN 
+0855 01 1c 0c			ld		BC,CHOOSE_FILE_SIZE 
+0858 cd 70 02			call	SAVE_SCREEN_AREA 
+085b fd 75 08			ld		(IY+CF_SAVE_SCREEN),L 
+085e fd 74 09			ld		(IY+CF_SAVE_SCREEN+1),H 
+0861			 
+0861				; Setup colours 
+0861 21 42 f2			ld		HL,COLOR_RAM + CHOOSE_FILE_ORIGIN 
+0864 01 1c 0c			ld		BC,CHOOSE_FILE_SIZE 
+0867 3e cf			ld		A,0xCF 
+0869				COLOR_RAM_IN 
+0869				endm 
+# End of macro COLOR_RAM_IN
+0869 cd 5c 02			call	CLEAR_SCREEN_AREA 
+086c				COLOR_RAM_OUT 
+086c				endm 
+# End of macro COLOR_RAM_OUT
+086c			 
+086c				; Draw border 
+086c 21 42 f0			ld		HL,VCHAR_RAM + CHOOSE_FILE_ORIGIN 
+086f 01 1c 0c			ld		BC,CHOOSE_FILE_SIZE 
+0872 cd a1 01			call	DRAW_BORDER_AT 
+0875			 
+0875				; Allocate enough room for a pointer to every possible file name 
+0875 2a 28 42			ld		HL,(TOTAL_DIR_ENTRIES) 
+0878 29				add		HL,HL 
+0879 23				inc		HL			; add 2 for the terminator 
+087a 23				inc		HL 
+087b 23				inc		HL			; and 2 for the "eject" entry 
+087c 23				inc		HL 
+087d e5				push	HL 
+087e c1				pop		BC 
+087f cd 7e 07			call	HeapAlloc 
+0882 fd 75 0a			ld		(IY+CF_STRINGS),L 
+0885 fd 74 0b			ld		(IY+CF_STRINGS+1),H 
+0888			 
+0888				; IX is destination string pointer 
+0888 e5				push	HL 
+0889 dd e1			pop		IX 
+088b			 
+088b fd 7e 00			ld		A,(IY+CF_CAN_EJECT) 
+088e b7				or		A 
+088f 28 0d			jr		Z,cf_no_eject 
+0891			 
+0891 21 18 08			ld		HL,CF_STR_NONE 
+0894 dd 75 00			ld		(IX+0),L 
+0897 dd 74 01			ld		(IX+1),H 
+089a dd 23			inc		IX 
+089c dd 23			inc		IX 
+089e			 
+089e			cf_no_eject: 
+089e			 
+089e				; Calculate pointer to file name of first directory entry 
+089e 2a 26 42			ld		HL,(PTR_DIRECTORY) 
+08a1 11 0a 00			ld		DE,DIR_FILENAME 
+08a4 19				add		HL,DE 
+08a5			 
+08a5 ed 4b 28 42		ld		BC,(TOTAL_DIR_ENTRIES) 
+08a9			cf_scan_dir: 
+08a9			 
+08a9				; Is the file name zero length? 
+08a9 7e				ld		A,(HL) 
+08aa b7				or		A 
+08ab 28 3b			jr		Z,cf_skip_file 
+08ad			 
+08ad fd 5e 06			ld		E,(IY+CF_FILTER) 
+08b0 fd 56 07			ld		D,(IY+CF_FILTER+1) 
+08b3 e5				push	HL 
+08b4 cd 84 09			call	IS_EXTENSION_ONE_OF 
+08b7 e1				pop		HL 
+08b8 20 2e			jr		NZ,cf_skip_file 
+08ba			 
+08ba				; Check this file is the currently selected file 
+08ba fd 7e 04			ld		A,(IY+CF_CURR_FILE) 
+08bd bd				cp		L 
+08be 20 1e			jr		NZ,cf_not_curr_file 
+08c0 fd 7e 05			ld		A,(IY+CF_CURR_FILE+1) 
+08c3 bc				cp		H 
+08c4 20 18			jr		NZ,cf_not_curr_file 
+08c6			 
+08c6				; This is the current file, work out it's index 
+08c6				;  (IX-pStrings)/2 
+08c6 e5				push	HL 
+08c7 dd e5			push	IX 
+08c9 e1				pop		HL 
+08ca fd 5e 0a			ld		E,(IY+CF_STRINGS) 
+08cd fd 56 0b			ld		D,(IY+CF_STRINGS+1) 
+08d0 b7				or		A 
+08d1 ed 52			sbc		HL,DE 
+08d3 cb 3c			SRL		H		; Shift HL right by one 
+08d5 cb 1d			RR		L 
+08d7 fd 75 02			ld		(IY+CF_SEL_INDEX),L 
+08da fd 74 03			ld		(IY+CF_SEL_INDEX+1),H 
+08dd e1				pop		HL 
+08de			 
+08de			cf_not_curr_file: 
+08de			 
+08de				; Store the file name pointer in list strings 
+08de dd 75 00			ld		(IX+0),L 
+08e1 dd 74 01			ld		(IX+1),H 
+08e4 dd 23			inc		IX 
+08e6 dd 23			inc		IX 
+08e8			 
+08e8			 
+08e8			cf_skip_file: 
+08e8 11 20 00			ld		DE,DIR_SIZE 
+08eb 19				add		HL,DE 
+08ec 0b				dec		BC 
+08ed 78				ld		A,B 
+08ee b1				or		C 
+08ef 20 b8			jr		nz,cf_scan_dir 
+08f1			 
+08f1				; Null terminate the list of strings 
+08f1 af				xor		A 
+08f2 dd 77 00			ld		(IX+0),A 
+08f5 dd 77 01			ld		(IX+1),A 
+08f8			 
+08f8				; Show the list box	 
+08f8 fd e5			push	IY 
+08fa fd 6e 0a			ld		L,(IY+CF_STRINGS) 
+08fd fd 66 0b			ld		H,(IY+CF_STRINGS+1) 
+0900 e5				push	HL			; Strings 
+0901 21 63 00			ld		HL,CHOOSE_FILE_ORIGIN+SCREEN_WIDTH+1		; Origin 
+0904 e5				push	HL			 
+0905 21 1a 0a			ld		HL,CHOOSE_FILE_SIZE-0x0202	; Size 
+0908 e5				push	HL 
+0909 fd 6e 02			ld		L,(IY+CF_SEL_INDEX) 
+090c fd 66 03			ld		H,(IY+CF_SEL_INDEX+1) 
+090f e5				push	HL 
+0910 21 cf b0			ld		HL,0xB0CF	; Colours 
+0913 e5				push	HL 
+0914 21 00 00			ld		HL,0		; Callback 
+0917 e5				push	HL 
+0918 cd 44 05			call 	LISTBOX 
+091b fd 21 0c 00		ld		IY,12 
+091f fd 39			add		IY,SP 
+0921 fd f9			ld		SP,IY 
+0923 fd e1			pop		IY 
+0925			 
+0925 7a				ld		A,D 
+0926 e6 80			and		0x80 
+0928 20 3d			jr		NZ,cf_cancelled 
+092a			 
+092a fd 7e 00			ld		A,(IY+CF_CAN_EJECT) 
+092d b7				or		A 
+092e 28 04			jr		Z,cf_select_image 
+0930			 
+0930 7a				ld		A,D 
+0931 b3				or		E 
+0932 28 30			jr		Z,cf_eject 
+0934			 
+0934			cf_select_image: 
+0934				; Convert the selected index back into directory entry number 
+0934 fd 6e 0a			ld		L,(IY+CF_STRINGS) 
+0937 fd 66 0b			ld		H,(IY+CF_STRINGS+1) 
+093a 19				add		HL,DE 
+093b 19				add		HL,DE 
+093c 5e				ld		E,(HL) 
+093d 23				inc		HL 
+093e 56				ld		D,(HL)						; DE = pointer to file name 
+093f eb				ex		DE,HL 
+0940 11 0a 00			ld		DE,DIR_FILENAME 
+0943 b7				or		A 
+0944 ed 52			sbc		HL,DE						; HL = pointer to directory entry 
+0946 ed 5b 26 42		ld		DE,(PTR_DIRECTORY) 
+094a b7				or		A 
+094b ed 52			sbc		HL,DE						; HL = offset from directory memory to directory entry 
+094d			 
+094d cb 3c			SRL		H							; /2 
+094f cb 1d			RR		L 
+0951 cb 3c			SRL		H							; /4 
+0953 cb 1d			RR		L 
+0955 cb 3c			SRL		H							; /8 
+0957 cb 1d			RR		L 
+0959 cb 3c			SRL		H							; /16 
+095b cb 1d			RR		L 
+095d cb 3c			SRL		H							; /32 
+095f cb 1d			RR		L 
+0961			 
+0961 eb				ex		DE,HL						; DE = directory index 
+0962			 
+0962 18 03			jr		cf_finished 
+0964			 
+0964			cf_eject: 
+0964 11 fe ff			ld		DE,0xFFFE					; -2 = eject disk 
+0967			 
+0967			cf_cancelled: 
+0967			cf_finished: 
+0967 d5				push	DE 
+0968				; Free memory 
+0968 fd 6e 0a			ld		L,(IY+CF_STRINGS) 
+096b fd 66 0b			ld		H,(IY+CF_STRINGS+1) 
+096e cd f1 07			call	HeapFree 
+0971			 
+0971				; Restore the screen area 
+0971 fd 6e 08			ld		L,(IY+CF_SAVE_SCREEN) 
+0974 fd 66 09			ld		H,(IY+CF_SAVE_SCREEN+1) 
+0977 cd ca 02			call	RESTORE_SCREEN_AREA 
+097a			 
+097a d1				pop		DE 
+097b			 
+097b				; Clean up local stack frame 
+097b fd 21 0c 00		ld		IY,CF_LOCAL_SPACE 
+097f fd 39			add		IY,SP 
+0981 fd f9			ld		SP,IY 
+0983 c9				ret 
+0984			 
+0984			CHOOSE_FILE_END: 
+0984			 
+0984			; Given a filename in HL 
+0984			; and a double NULL terminated string (without the dot) in DE 
+0984			; eg: db "hd0",0,"hd1",0,0.  Pass DE=NULL to match all files 
+0984			; Return Z if one matches 
+0984			IS_EXTENSION_ONE_OF: 
+0984				 
+0984 7a				ld		A,D 
+0985 b3				or		E 
+0986 c8				ret		Z 
+0987			 
+0987				; Find the file's extension 
+0987 cd 30 03			call	FIND_EXTENSION 
+098a 7c				ld		A,H 
+098b b5				or		L 
+098c 20 03			jr		nz,ix_has_extension 
+098e			 
+098e				; No extension, no match 
+098e f6 01			or		1 
+0990 c9				ret 
+0991			 
+0991			ix_has_extension: 
+0991 23				inc		HL 
+0992			 
+0992			ix_loop: 
+0992				; HL = filename extension (after dot) 
+0992			 	; DE = next extension to match 
+0992 e5				push	HL 
+0993 cd 44 03			call	STRICMP 
+0996 e1				pop		HL 
+0997 c8				ret		Z 
+0998			 
+0998				; Find the next extension 
+0998			ix_loop2: 
+0998 1a				ld		A,(DE) 
+0999 b7				or		A 
+099a 13				inc		DE 
+099b 20 fb			jr		NZ,ix_loop2 
+099d			 
+099d				; End of the list? 
+099d 1a				ld		A,(DE) 
+099e b7				or		A 
+099f 20 f1			jr		NZ,ix_loop 
+09a1			 
+09a1				; Doesn't match any extension 
+09a1 f6 01			or		1 
+09a3 c9				ret 
+09a4			 
+09a4			IS_EXTENSION_ONE_OF_END:
+# End of file ChooseFile.asm
+09a4			 
+09a4			 
+09a4			MSG: 
+09a4 ..				db		"FPGABee v2.0.1" 
+09b2			MSG_LEN:	EQU $-MSG 
+09b2			 
+09b2			; Disk type constants 
+09b2			DISK_DS40: EQU 0 
+09b2			DISK_SS80: EQU 1 
+09b2			DISK_DS80: EQU 2 
+09b2			DISK_DS82: EQU 3 
+09b2			DISK_DS84: EQU 4 
+09b2			DISK_DS8B: EQU 5 
+09b2			DISK_HD0:  EQU 6 
+09b2			DISK_HD1:  EQU 7 
+09b2			DISK_NONE: EQU 8 
+09b2			 
+09b2			MAIN_MENU: 
+09b2 2a 42			dw	MENU_STR_HD1 
+09b4 4a 42			dw	MENU_STR_FD0 
+09b6 6a 42			dw	MENU_STR_FD1 
+09b8 fa 09			dw	STR_SEP 
+09ba fc 09			dw	STR_RESET 
+09bc 00 00			dw	0 
+09be			 
+09be			STR_DISK_EXTENSIONS: 
+09be .. 00			db "ds40",0 
+09c3 .. 00			db "ss80",0 
+09c8 .. 00			db "ds80",0 
+09cd .. 00			db "ds82",0 
+09d2 .. 00			db "ds84",0 
+09d7 .. 00			db "ds8B",0 
+09dc .. 00 00			db "hd0",0,0		; Pad to 5 chars 
+09e1 .. 00 00			db "hd1",0,0 
+09e6			 
+09e6 .. 00		STR_HD1:	db "HD1:",0 
+09eb .. 00		STR_FD0:	db "FD0:",0 
+09f0 .. 00		STR_FD1:	db "FD1:",0 
+09f5 .. 00		STR_FD2:	db "FD2:",0 
+09fa .. 00		STR_SEP:	db "-",0 
+09fc .. 00		STR_RESET:	db "Reset",0 
+0a02			 
+0a02			 
+0a02			; Main entry point 
+0a02			PCU_MAIN: 
+0a02				; Setup stack 
+0a02 31 00 80			ld		SP,RAM_HI 
+0a05			 
+0a05			if DEBUG 
+0a05				call	DebugInit 
+0a05			endif 
+0a05			 
+0a05 cd 71 07			call	HeapInit 
+0a08			 
+0a08				; Clear screen and draw border 
+0a08 3e 00			LD		A,0 
+0a0a cd 0b 02			call	CLEAR_COLOR 
+0a0d cd fd 01			call	CLEAR_SCREEN 
+0a10			 
+0a10				; Wait for SD startup 
+0a10			wait_sd_card: 
+0a10 db c7			IN		A,(0xC7) 
+0a12 e6 40			AND		0x40 
+0a14 20 fa			JR		NZ,wait_sd_card 
+0a16			 
+0a16				; Read the config sector and directory 
+0a16 cd 58 0b			call	READ_CONFIG 
+0a19 cd 88 0b			call	READ_DIRECTORY 
+0a1c cd 4a 0c			call	INSERT_DISKS 
+0a1f cd ba 0c			call	LOAD_ROMS 
+0a22			 
+0a22 21 e6 09			ld		HL,STR_HD1 
+0a25 11 2a 42			ld		DE,MENU_STR_HD1 
+0a28 ed 4b 1a 42		ld		BC,(FBFS_CONFIG + FBFS_DI_DISK_1) 
+0a2c cd de 0b			call	SETUP_MENU_SELECTION 
+0a2f			 
+0a2f 21 eb 09			ld		HL,STR_FD0 
+0a32 11 4a 42			ld		DE,MENU_STR_FD0 
+0a35 ed 4b 1e 42		ld		BC,(FBFS_CONFIG + FBFS_DI_DISK_3) 
+0a39 cd de 0b			call	SETUP_MENU_SELECTION 
+0a3c			 
+0a3c 21 f0 09			ld		HL,STR_FD1 
+0a3f 11 6a 42			ld		DE,MENU_STR_FD1 
+0a42 ed 4b 20 42		ld		BC,(FBFS_CONFIG + FBFS_DI_DISK_4) 
+0a46 cd de 0b			call	SETUP_MENU_SELECTION 
+0a49			 
+0a49				; Clear color 
+0a49 21 00 f2			ld		HL,COLOR_RAM 
+0a4c 01 20 07			ld		BC,0x0720 
+0a4f 3e cf			ld		A,0xCF 
+0a51				COLOR_RAM_IN 
+0a51				endm 
+# End of macro COLOR_RAM_IN
+0a51 cd 5c 02			call	CLEAR_SCREEN_AREA 
+0a54				COLOR_RAM_OUT 
+0a54				endm 
+# End of macro COLOR_RAM_OUT
+0a54			 
+0a54 21 00 f0			ld		HL,VCHAR_RAM 
+0a57 01 20 07			ld		BC,0x0720 
+0a5a cd a1 01			call	DRAW_BORDER_AT 
+0a5d			 
+0a5d				; Display a message 
+0a5d 21 a4 09			ld		HL,MSG 
+0a60 11 09 f0			ld		DE,0xF000 + (SCREEN_WIDTH-MSG_LEN)/2 
+0a63 01 0e 00			ld		BC,MSG_LEN 
+0a66 ed b0			ldir 
+0a68			 
+0a68				; Display the main menu 
+0a68 21 b2 09			ld		HL,MAIN_MENU			; Strings 
+0a6b e5				push	HL 
+0a6c 21 21 00			ld		HL,0x0021				; Position 
+0a6f e5				push	HL 
+0a70 21 1e 05			ld		HL,0x051e				; Size 
+0a73 e5				push	HL 
+0a74 21 00 00			ld		HL,0					; Selection 
+0a77 e5				push	HL 
+0a78 21 cf b0			ld		HL,0xB0CF				; Colours 
+0a7b e5				push	HL 
+0a7c 21 8e 0a			ld		HL,MAIN_MENU_SELECTED	; Callback 
+0a7f e5				push	HL 
+0a80 cd 44 05			call	LISTBOX 
+0a83			 
+0a83				; Should never get here 
+0a83 18 fe			jr		$ 
+0a85			 
+0a85			PCU_MAIN_END: 
+0a85			 
+0a85			hexdump: 
+0a85 7e			        LD      A,(HL) 
+0a86 cd 21 02		        CALL    PRT_HEX_BYTE 
+0a89 23			        INC     HL 
+0a8a 13			        INC     DE 
+0a8b 10 f8		        DJNZ    hexdump 
+0a8d c9			        RET 
+0a8e			 
+0a8e			 
+0a8e			MAIN_MENU_SELECTED: 
+0a8e 7a				ld		A,D 
+0a8f e6 80			and		80h 
+0a91 20 1d			jr		nz,hide_menu 
+0a93 7b				ld		A,E 
+0a94 fe 00			cp		0 
+0a96 28 1f			jr		Z,choose_hd1 
+0a98 fe 01			cp		1 
+0a9a 28 2d			jr		Z,choose_fd0 
+0a9c fe 02			cp		2 
+0a9e 28 3b			jr		Z,choose_fd1 
+0aa0 fe 04			cp		4 
+0aa2 28 03			jr		Z,invoke_reset 
+0aa4 f6 01			or		1 
+0aa6 c9				ret 
+0aa7			 
+0aa7			invoke_reset: 
+0aa7 3e 00			ld		A,0 
+0aa9 d3 81			out		(0x81),A 
+0aab d3 ff			out		(0xFF),A 
+0aad f6 01			or		1					; shouldn't get to here... 
+0aaf c9				ret 
+0ab0			 
+0ab0			hide_menu: 
+0ab0 3e 00			ld		A,0 
+0ab2 d3 81			out		(0x81),A 
+0ab4 f6 01			or		1 
+0ab6 c9				ret 
+0ab7			 
+0ab7			choose_hd1: 
+0ab7 2a 1a 42			ld		HL,(FBFS_CONFIG + FBFS_DI_DISK_1) 
+0aba 11 30 0b			ld		DE,FILTER_HDD_IMAGES 
+0abd 3e 01			ld		A,1 
+0abf cd 20 08			call	CHOOSE_FILE 
+0ac2 21 2f 42			ld		HL,MENU_STR_HD1 + 5 
+0ac5 0e 01			ld		C,1 
+0ac7 18 24			jr		insert_disk 
+0ac9			 
+0ac9			choose_fd0: 
+0ac9 2a 1e 42			ld		HL,(FBFS_CONFIG + FBFS_DI_DISK_3) 
+0acc 11 39 0b			ld		DE,FILTER_FDD_IMAGES 
+0acf 3e 01			ld		A,1 
+0ad1 cd 20 08			call	CHOOSE_FILE 
+0ad4 21 4f 42			ld		HL,MENU_STR_FD0 + 5 
+0ad7 0e 03			ld		C,3 
+0ad9 18 12			jr		insert_disk 
+0adb			 
+0adb			choose_fd1: 
+0adb 2a 20 42			ld		HL,(FBFS_CONFIG + FBFS_DI_DISK_4) 
+0ade 11 39 0b			ld		DE,FILTER_FDD_IMAGES 
+0ae1 3e 01			ld		A,1 
+0ae3 cd 20 08			call	CHOOSE_FILE 
+0ae6 21 6f 42			ld		HL,MENU_STR_FD1 + 5 
+0ae9 0e 04			ld		C,4 
+0aeb 18 00			jr		insert_disk 
+0aed			 
+0aed			insert_disk: 
+0aed				; DE = -1 if cancelled, -2 if eject, else directory index 
+0aed				; HL = menu string to be updated 
+0aed				; C = drive number 
+0aed 7a				ld		A,D 
+0aee e6 80			and		0x80 
+0af0 28 12			jr		Z,have_new_disk 
+0af2 7b				ld		A,E 
+0af3 fe fe			cp		0xFE 
+0af5 28 03			jr		Z,eject_disk 
+0af7 f6 01			or		1 
+0af9 c9				ret 
+0afa			 
+0afa			eject_disk: 
+0afa				; Reset the menu string 
+0afa 36 2d			ld		(HL),'-' 
+0afc 23				inc		HL 
+0afd 36 00			ld		(HL),0 
+0aff 11 ff ff			ld		DE,0xFFFF 
+0b02 18 16			jr		apply_new_disk 
+0b04			 
+0b04			have_new_disk: 
+0b04				; Update the menu string 
+0b04 d5				push	DE 
+0b05 e5				push	HL 
+0b06 eb				ex		DE,HL 
+0b07 29				add		HL,HL		; * 2 
+0b08 29				add		HL,HL		; * 4 
+0b09 29				add		HL,HL		; * 8 
+0b0a 29				add		HL,HL		; * 16 
+0b0b 29				add		HL,HL		; * 32 
+0b0c ed 5b 26 42		ld		DE,(PTR_DIRECTORY) 
+0b10 19				add		HL,DE 
+0b11 11 0a 00			ld		DE,DIR_FILENAME 
+0b14 19				add		HL,DE 
+0b15 d1				pop		DE 
+0b16 cd 28 03			call	STRCPY 
+0b19 d1				pop		DE 
+0b1a			 
+0b1a			apply_new_disk: 
+0b1a				; DE = directory number 
+0b1a				; C = drive number 
+0b1a			 
+0b1a				; Update the config record 
+0b1a c5				push	BC 
+0b1b 21 18 42			ld		HL,FBFS_CONFIG + FBFS_DI_DISK_0 
+0b1e 06 00			ld		B,0 
+0b20 09				add		HL,BC 
+0b21 09				add		HL,BC 
+0b22 73				ld		(HL),E 
+0b23 23				inc		HL 
+0b24 72				ld		(HL),D 
+0b25 c1				pop		BC 
+0b26			 
+0b26				; Update the disk controller 
+0b26 79				ld		A,C			 
+0b27 cd 06 0c			call	INSERT_DISK 
+0b2a			 
+0b2a				; Save the config 
+0b2a cd 70 0b			call	WRITE_CONFIG 
+0b2d			 
+0b2d f6 01			or		1 
+0b2f c9				ret 
+0b30			MAIN_MENU_SELECTED_END: 
+0b30			 
+0b30 .. 00 .. 00 00	FILTER_HDD_IMAGES:	db "hd0",0,"hd1",0,0 
+0b39 .. 00 .. 00 .. 00 .. 00 .. 00 .. 00 00	FILTER_FDD_IMAGES:  db "ds40",0,"ss80",0,"ds80",0,"ds82",0,"ds84",0,"ds8b",0,0 
+0b58			 
+0b58			; Read the config record 
+0b58			READ_CONFIG: 
+0b58				; Read the config sector 
+0b58 11 00 00			ld		DE,0 
+0b5b 01 00 00			ld		BC,0 
+0b5e 21 00 40			ld		HL,SECTOR_BUFFER 
+0b61 cd 67 01			call	DISK_READ 
+0b64 21 00 40			ld		HL,SECTOR_BUFFER 
+0b67 11 04 42			ld		DE,FBFS_CONFIG 
+0b6a 01 22 00			ld		BC,FBFS_CONFIG_SIZE 
+0b6d ed b0			ldir 
+0b6f c9				ret 
+0b70			READ_CONFIG_END: 
+0b70			 
+0b70			; Write the config record 
+0b70			WRITE_CONFIG: 
+0b70 21 04 42			ld		HL,FBFS_CONFIG 
+0b73 11 00 40			ld		DE,SECTOR_BUFFER 
+0b76 01 22 00			ld		BC,FBFS_CONFIG_SIZE 
+0b79 ed b0			ldir 
+0b7b 11 00 00			ld		DE,0 
+0b7e 01 00 00			ld		BC,0 
+0b81 21 00 40			ld		HL,SECTOR_BUFFER 
+0b84 cd 84 01			call	DISK_WRITE 
+0b87 c9				ret 
+0b88			WRITE_CONFIG_END: 
+0b88			 
+0b88			; Allocate a block of memory, store it at (PTR_DIRECTORY) and read all 
+0b88			; the directory clusters in. 
+0b88			READ_DIRECTORY: 
+0b88				; Work out total directory size (DIRCOUNT * 512) 
+0b88 3a 0e 42			ld		A,(FBFS_CONFIG + FBFS_DIRCOUNT) 
+0b8b cb 27			sla		A 
+0b8d 47				ld		B,A 
+0b8e 0e 00			ld		C,0 
+0b90			 
+0b90				; Allocate memory 
+0b90 cd 7e 07			call 	HeapAlloc 
+0b93 22 26 42			ld		(PTR_DIRECTORY),HL 
+0b96			 
+0b96				; Get the first block number (32 bit argh!) 
+0b96 ed 4b 0a 42		ld		BC,(FBFS_CONFIG + FBFS_DIRBLK) 
+0b9a ed 5b 0c 42		ld		DE,(FBFS_CONFIG + FBFS_DIRBLK + 2) 
+0b9e			 
+0b9e 3a 0e 42			ld		A,(FBFS_CONFIG + FBFS_DIRCOUNT) 
+0ba1			 
+0ba1			dir_load_loop: 
+0ba1 f5				push	AF 
+0ba2				; Save block number 
+0ba2 c5				push	BC 
+0ba3 d5				push	DE 
+0ba4			 
+0ba4				; Read a block 
+0ba4 cd 67 01			call	DISK_READ 
+0ba7			 
+0ba7				; Restore block number 
+0ba7 d1				pop		DE 
+0ba8 c1				pop		BC 
+0ba9			 
+0ba9				; Increment block number 
+0ba9 e5				push	HL 
+0baa 21 01 00			ld		HL,1 
+0bad 09				add		HL,BC 
+0bae e5				push	HL 
+0baf c1				pop		BC 
+0bb0 21 00 00			ld		HL,0 
+0bb3 ed 5a			adc		HL,DE 
+0bb5 eb				ex		DE,HL 
+0bb6 e1				pop		HL 
+0bb7			 
+0bb7				; Loop counter 
+0bb7 f1				pop		AF 
+0bb8 d6 01			sub		1 
+0bba 20 e5			jr		nz,dir_load_loop 
+0bbc			 
+0bbc				; Now work out how many directory entries were actually used 
+0bbc dd 2a 26 42		ld		IX,(PTR_DIRECTORY) 
+0bc0 01 00 00			ld		BC,0 
+0bc3 11 20 00			ld		DE,DIR_SIZE 
+0bc6			dir_load_count_loop: 
+0bc6 dd 7e 00			ld		A,(IX+0) 
+0bc9 dd b6 01			or		(IX+1) 
+0bcc dd b6 02			or		(IX+2) 
+0bcf dd b6 03			or		(IX+3) 
+0bd2 28 05			jr		z,dir_end_found 
+0bd4 dd 19			add		IX,DE 
+0bd6 03				inc		BC 
+0bd7 18 ed			jr		dir_load_count_loop 
+0bd9			 
+0bd9			dir_end_found: 
+0bd9 ed 43 28 42		ld		(TOTAL_DIR_ENTRIES),BC 
+0bdd c9				ret 
+0bde			 
+0bde			READ_DIRECTORY_END: 
+0bde			 
+0bde			SETUP_MENU_SELECTION: 
+0bde			 
+0bde				; Copy the menu item name 
+0bde cd 28 03			call 	STRCPY 
+0be1			 
+0be1				; Overwrite the NULL terminator 
+0be1 eb				ex		DE,HL 
+0be2 2b				dec		HL 
+0be3 36 20			ld		(HL),' ' 
+0be5 23				inc		HL 
+0be6			 
+0be6				; Is a file selected? 
+0be6 78				ld		A,B 
+0be7 e6 80			and		0x80 
+0be9 28 06			jr		z,sms_setup_filename 
+0beb			 
+0beb				; No, n/a 
+0beb 36 2d			ld		(HL),'-' 
+0bed 23				inc		HL 
+0bee 36 00			ld		(HL),0 
+0bf0 c9				ret 
+0bf1			 
+0bf1			sms_setup_filename: 
+0bf1 eb				ex		DE,HL 
+0bf2 c5				push	BC 
+0bf3 e1				pop		HL 
+0bf4 29				add		HL,HL		; * 2 
+0bf5 29				add		HL,HL		; * 4 
+0bf6 29				add		HL,HL		; * 8 
+0bf7 29				add		HL,HL		; * 16 
+0bf8 29				add		HL,HL		; * 32 
+0bf9 01 0a 00			ld		BC,DIR_FILENAME 
+0bfc 09				add		HL,BC		; Pointer to file name 
+0bfd ed 4b 26 42		ld		BC,(PTR_DIRECTORY) 
+0c01 09				add		HL,BC 
+0c02 cd 28 03			call	STRCPY 
+0c05			 
+0c05 c9				ret 
+0c06			SETUP_MENU_SELECTION_END: 
+0c06			 
+0c06			; DE = directory index 
+0c06			; A = drive number (0-6) 
+0c06			INSERT_DISK: 
+0c06			 
+0c06				; Save registers 
+0c06 e5				push	HL 
+0c07 c5				push	BC 
+0c08			 
+0c08				; Save drive number  
+0c08 f5				push	AF 
+0c09			 
+0c09				; Check for "eject" (DE==-1) 
+0c09 7a				ld		A,D 
+0c0a e6 80			and		80h 
+0c0c 28 0e			jr		z,id_has_disk 
+0c0e			 
+0c0e				; Clear the block number 
+0c0e 3e 00			ld		A,0 
+0c10 d3 c1			out		(0xc1),A 
+0c12 d3 c1			out		(0xc1),A 
+0c14 d3 c1			out		(0xc1),A 
+0c16 d3 c1			out		(0xc1),A 
+0c18			 
+0c18				; No disk 
+0c18 3e 08			ld		A,DISK_NONE 
+0c1a 18 19			jr		id_have_disk_type 
+0c1c			 
+0c1c			id_has_disk: 
+0c1c eb				ex		DE,HL 
+0c1d 29				add		HL,HL		; *2 
+0c1e 29				add		HL,HL		; *4 
+0c1f 29				add		HL,HL		; *8 
+0c20 29				add		HL,HL		; *16 
+0c21 29				add		HL,HL		; *32 
+0c22 ed 5b 26 42		ld		DE,(PTR_DIRECTORY) 
+0c26 19				add		HL,DE 
+0c27			 
+0c27				; Write the base block number 
+0c27 e5				push	HL 
+0c28 01 c1 04			ld		BC,0x04c1 
+0c2b ed b3			otir 
+0c2d e1				pop		HL 
+0c2e			 
+0c2e				; Work out the disk type from the file's extension 
+0c2e 11 0a 00			ld		DE,DIR_FILENAME 
+0c31 19				add		HL,DE 
+0c32 cd d0 0c			call	IMAGE_TYPE_FROM_EXTENSION 
+0c35			 
+0c35			 
+0c35			id_have_disk_type: 
+0c35 cb 27			sla		A 
+0c37 cb 27			sla		A 
+0c39 cb 27			sla		A 
+0c3b 47				ld		B,A 
+0c3c			 
+0c3c				; Get drive number back 
+0c3c f1				pop		AF 
+0c3d			 
+0c3d				; Adjust floppy drive number to match what disk controller expects 
+0c3d fe 03			cp		3 
+0c3f 38 01			jr		C,id_no_inc 
+0c41 3c				inc		A 
+0c42			id_no_inc: 
+0c42			 
+0c42				; Compose the final command and send it 
+0c42 f6 80			or		80h			; Command 
+0c44 b0				or		B			; Disk type 
+0c45 d3 c7			out		(0xC7),A	; Invoke the command 
+0c47			 
+0c47				; Restore registers 
+0c47 c1				pop		BC 
+0c48 e1				pop		HL 
+0c49 c9				ret 
+0c4a			 
+0c4a			INSERT_DISK_END: 
+0c4a			 
+0c4a			INSERT_DISKS: 
+0c4a			 
+0c4a 21 18 42			ld		HL,FBFS_CONFIG + FBFS_DI_DISK_0 
+0c4d 06 07			ld		B,7 
+0c4f			 
+0c4f			id_loop: 
+0c4f				; Get the directory entry 
+0c4f 5e				ld		E,(HL) 
+0c50 23				inc		HL 
+0c51 56				ld		D,(HL) 
+0c52 23				inc		HL 
+0c53			 
+0c53				; Calculate drive number 
+0c53 3e 07			ld		A,7 
+0c55 90				sub		B 
+0c56			 
+0c56				; Insert it 
+0c56 cd 06 0c			call	INSERT_DISK 
+0c59			 
+0c59 10 f4			djnz	id_loop 
+0c5b			 
+0c5b c9				ret 
+0c5c			 
+0c5c			INSERT_DISKS_END: 
+0c5c			 
+0c5c			; DE = directory index 
+0c5c			; A = ROM Pack number 
+0c5c			LOAD_ROM: 
+0c5c			 
+0c5c				; Map in Microbee's ROM pack RAM 
+0c5c f6 80			or		0x80 
+0c5e d3 d0			out		(0xD0),A 
+0c60			 
+0c60				; Clear old ROM data 
+0c60 d5				push	DE 
+0c61 21 00 80			ld		HL,ROM_PACK_LOAD_ADDR 
+0c64 11 01 80			ld		DE,ROM_PACK_LOAD_ADDR+1 
+0c67 01 ff 3f			ld		BC,0x3fff 
+0c6a 36 00			ld		(HL),0 
+0c6c ed b0			ldir 
+0c6e d1				pop		DE 
+0c6f			 
+0c6f				; Check for "no rom" 
+0c6f 7a				ld		A,D 
+0c70 e6 80			and		80h 
+0c72 20 42			jr		NZ,lr_exit 
+0c74			 
+0c74				; Find the directory entry 
+0c74 eb				ex		DE,HL 
+0c75 29				add		HL,HL		; * 2 
+0c76 29				add		HL,HL		; * 4 
+0c77 29				add		HL,HL		; * 8 
+0c78 29				add		HL,HL		; * 16 
+0c79 29				add		HL,HL		; * 32 
+0c7a ed 5b 26 42		ld		DE,(PTR_DIRECTORY) 
+0c7e 19				add		HL,DE 
+0c7f			 
+0c7f				; HL is pointer to directory entry for the ROM, read the block number 
+0c7f			 
+0c7f				; Copy the block number to scratch 
+0c7f 11 aa 42			ld		DE,SCRATCH 
+0c82 01 04 00			ld		BC,4 
+0c85 ed b0			ldir 
+0c87			 
+0c87				; Load the number of blocks and limit to 32 
+0c87 7e				ld		A,(HL); 
+0c88 3d				dec		A 
+0c89 e6 1f			and		0x1f 
+0c8b 3c				inc		A 
+0c8c 47				ld		B,A 
+0c8d			 
+0c8d 21 00 80			ld		HL,ROM_PACK_LOAD_ADDR 
+0c90			 
+0c90			lr_read_loop: 
+0c90 c5				push	BC 
+0c91			 
+0c91				; Read the block 
+0c91 ed 4b aa 42		ld		BC,(SCRATCH) 
+0c95 ed 5b ac 42		ld		DE,(SCRATCH+2) 
+0c99 cd 67 01			call	DISK_READ 
+0c9c			 
+0c9c				; Increment the block number 
+0c9c eb				ex		DE,HL 
+0c9d 2a aa 42			ld		HL,(SCRATCH) 
+0ca0 01 01 00			ld		BC,1 
+0ca3 09				add		HL,BC 
+0ca4 22 aa 42			ld		(SCRATCH),HL 
+0ca7 2a ac 42			ld		HL,(SCRATCH+2) 
+0caa 01 00 00			ld		BC,0 
+0cad ed 4a			adc		HL,BC 
+0caf 22 ac 42			ld		(SCRATCH+2),HL 
+0cb2 eb				ex		DE,HL 
+0cb3			 
+0cb3				; Loop 
+0cb3 c1				pop		BC 
+0cb4 10 da			djnz	lr_read_loop 
+0cb6			 
+0cb6			lr_exit: 
+0cb6				; Unmap ROM pack RAM 
+0cb6 af				xor		A 
+0cb7 d3 d0			out		(0xD0),A 
+0cb9			 
+0cb9 c9				ret 
+0cba			lr_has_rom: 
+0cba			 
+0cba			LOAD_ROM_END: 
+0cba			 
+0cba				 
+0cba			LOAD_ROMS: 
+0cba			 
+0cba 21 12 42			ld		HL,FBFS_CONFIG + FBFS_DI_ROM_0 
+0cbd 06 03			ld		B,3 
+0cbf			 
+0cbf			lrs_loop: 
+0cbf 5e				ld		E,(HL) 
+0cc0 23				inc		HL 
+0cc1 56				ld		D,(HL) 
+0cc2 23				inc		HL 
+0cc3			 
+0cc3 3e 03			ld		A,3 
+0cc5 90				sub		B 
+0cc6			 
+0cc6 c5				push	BC 
+0cc7 e5				push	HL 
+0cc8 cd 5c 0c			call	LOAD_ROM 
+0ccb e1				pop		HL 
+0ccc c1				pop		BC 
+0ccd			 
+0ccd 10 f0			djnz	lrs_loop 
+0ccf			 
+0ccf c9				ret 
+0cd0			LOAD_ROMS_END: 
+0cd0			 
+0cd0			; Work out the image type of a file by looking at it's extension 
+0cd0			; HL should point to the file name 
+0cd0			IMAGE_TYPE_FROM_EXTENSION: 
+0cd0				 
+0cd0 cd 30 03			call	FIND_EXTENSION 
+0cd3 7c				ld		A,H 
+0cd4 b5				or		L 
+0cd5 20 03			jr		nz,itfe_has_extension 
+0cd7 3e 08			ld		A,DISK_NONE 
+0cd9 c9				ret 
+0cda			itfe_has_extension: 
+0cda			 
+0cda 23				inc		HL 
+0cdb 06 08			ld		B,8 
+0cdd 11 be 09			ld		DE,STR_DISK_EXTENSIONS 
+0ce0 eb				ex		DE,HL 
+0ce1			itfe_loop: 
+0ce1 e5				push	HL 
+0ce2 d5				push	DE 
+0ce3 cd 44 03			call	STRICMP 
+0ce6 d1				pop		DE 
+0ce7 e1				pop		HL 
+0ce8 28 08			jr		z,itfe_found 
+0cea c5				push	BC 
+0ceb 01 05 00			ld		BC,5 
+0cee 09				add		HL,BC 
+0cef c1				pop		BC	 
+0cf0 10 ef			djnz	itfe_loop 
+0cf2			itfe_found: 
+0cf2 3e 08			ld		A,DISK_NONE 
+0cf4 90				sub		B 
+0cf5 c9				ret 
+0cf6			 
+0cf6			IMAGE_TYPE_FROM_EXTENSION_END: 
+0cf6			 
+# End of file PcuBoot.asm
+0cf6

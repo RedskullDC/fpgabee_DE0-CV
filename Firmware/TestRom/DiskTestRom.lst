@@ -1,0 +1,611 @@
+# File DiskTestRom.asm
+0000					ORG			08000h 
+8000			 
+8000			RAM_BASE:			EQU		7000h 
+8000			LIB_SCRATCH:		EQU		RAM_BASE + 20h 
+8000			CYL:				EQU		RAM_BASE 
+8000			 
+8000			START: 
+8000 31 00 80			LD		SP,0x8000 
+8003			 
+8003 21 f5 81			LD		HL,CRTC_Registers_64_16 
+8006 cd b2 82			CALL	setup_crtc 
+8009			 
+8009 cd 75 82			CALL	clear_screen 
+800c 3e 0b			LD		A,COLOR_YELLOW 
+800e cd 9b 82			CALL	clear_color_buffer 
+8011 cd 84 82			CALL	clear_attribute_buffer 
+8014			 
+8014				; Copy letters to RAM (testing) 
+8014 11 00 f0			LD		DE,CHAR_RAM_BASE 
+8017 21 de 81			LD		HL,MSG 
+801a 01 17 00			LD		BC,MSG_END-MSG 
+801d ed b0			LDIR  
+801f			 
+801f				; ;- setup each bank with signature ;- 
+801f dd 21 40 f0		LD		IX,CHAR_RAM_BASE+0x40 
+8023			 
+8023				; Select HDD controller 
+8023 3e 01			LD		A,1 
+8025 d3 58			OUT		(0x58),A 
+8027			 
+8027				; Read-write to port 0x40 should return different data 
+8027 3e a0			LD		A,0xA0 
+8029 d3 40			OUT		(0x40),A 
+802b af				XOR		A 
+802c db 40			IN		A,(0x40) 
+802e fe a0			CP		0xA0 
+8030 cd a5 81			CALL	CHECK_NZ 
+8033			 
+8033				; Read-write to port 0x41 should return different data 
+8033 3e a9			LD		A,0xA9 
+8035 d3 41			OUT		(0x41),A 
+8037 af				XOR		A 
+8038 db 41			IN		A,(0x41) 
+803a fe a9			CP		0xA9 
+803c cd a5 81			CALL	CHECK_NZ 
+803f			 
+803f				; Read-write to port 0x42 should return same data (sector count) 
+803f 3e aa			LD		A,0xAA 
+8041 d3 42			OUT		(0x42),A 
+8043 af				XOR		A 
+8044 db 42			IN		A,(0x42) 
+8046 fe aa			CP		0xAA 
+8048 cd 99 81			CALL	CHECK_Z 
+804b			 
+804b				; Read-write to port 0x43 should return same data (sector number) 
+804b 3e ab			LD		A,0xAB 
+804d d3 43			OUT		(0x43),A 
+804f af				XOR		A 
+8050 db 43			IN		A,(0x43) 
+8052 fe ab			CP		0xAB 
+8054 cd 99 81			CALL	CHECK_Z 
+8057			 
+8057				; Read-write to port 0x44 should return same data (track low) 
+8057 3e ac			LD		A,0xAC 
+8059 d3 44			OUT		(0x44),A 
+805b af				XOR		A 
+805c db 44			IN		A,(0x44) 
+805e fe ac			CP		0xAC 
+8060 cd 99 81			CALL	CHECK_Z 
+8063			 
+8063				; Read-write to port 0x45 should return same data (track hi) 
+8063 3e ad			LD		A,0xAD 
+8065 d3 45			OUT		(0x45),A 
+8067 af				XOR		A 
+8068 db 45			IN		A,(0x45) 
+806a fe ad			CP		0xAD 
+806c cd 99 81			CALL	CHECK_Z 
+806f			 
+806f				; Read-write to port 0x46 should return same data (SDH) 
+806f 3e ae			LD		A,0xAE 
+8071 d3 46			OUT		(0x46),A 
+8073 af				XOR		A 
+8074 db 46			IN		A,(0x46) 
+8076 fe ae			CP		0xAE 
+8078 cd 99 81			CALL	CHECK_Z 
+807b			 
+807b				; Read-write to port 0x47 should return different data (CMD) 
+807b 3e 90			LD		A,0x90 
+807d d3 47			OUT		(0x47),A 
+807f af				XOR		A 
+8080 db 47			IN		A,(0x47) 
+8082 fe 90			CP		0x90 
+8084 cd a5 81			CALL	CHECK_NZ 
+8087			 
+8087 dd 23			INC		IX 
+8089			 
+8089 cd fe 82			call	wait_key 
+808c			 
+808c 3e 00			LD		A,0 
+808e 32 00 70			LD		(CYL),A 
+8091			 
+8091			read_test: 
+8091			 
+8091 3a 00 70			LD		A,(CYL) 
+8094 6f				LD		L,A 
+8095 26 00			LD		H,0 
+8097 11 20 f0			LD		DE,0xf020 
+809a cd 0d 83			CALL	prt_int_word 
+809d			 
+809d				; Setup task file 
+809d 3e 01		 	LD		A,1				; Sector 1 
+809f d3 43			OUT		(0x43),A 
+80a1 3a 00 70			LD		A,(CYL)			; Track lo 
+80a4 d3 44			OUT		(0x44),A 
+80a6 3e 00			LD		A,0				; Track high 
+80a8 d3 45			OUT		(0x45),A 
+80aa 3e a8			LD		A,10101000b		; SIZE=512,HDD=1,HEAD=0 
+80ac d3 46			OUT		(0x46),A 
+80ae 3e 01			LD		A,1				; Sector count 
+80b0 d3 42			OUT		(0x42),A 
+80b2 3e 20			LD		A,0x20			; Read 
+80b4 d3 47			OUT		(0x47),A 
+80b6			 
+80b6			wait_read: 
+80b6 db 47			IN		A,(0x47) 
+80b8 e6 80			AND		0x80 
+80ba 20 fa			JR		NZ,wait_read 
+80bc			 
+80bc			;	LD		BC,4000 
+80bc			;wait_read: 
+80bc			;	DEC		BC 
+80bc			;	LD		A,B 
+80bc			;	OR		C 
+80bc			;	JR		NZ,wait_read 
+80bc			 
+80bc 21 00 30			LD		HL,0x3000 
+80bf 11 01 30			LD		DE,0x3001 
+80c2 01 3f 00			LD		BC,0x3f 
+80c5 36 fa			LD		(HL),0xFA 
+80c7 ed b0			LDIR 
+80c9			 
+80c9			 
+80c9 21 00 30			LD		HL,0x3000 
+80cc 01 40 00			LD		BC,0x0040 
+80cf ed b2			INIR 
+80d1 ed b2			INIR 
+80d3			 
+80d3			;	; Write the data 
+80d3			;	LD		BC,512 
+80d3			;	LD		DE,0x3000 
+80d3			;read_loop: 
+80d3			;	IN		A,(40h) 
+80d3			;	LD		(DE),A 
+80d3			;	INC		DE 
+80d3			;	DEC		BC 
+80d3			;	LD		A,B 
+80d3			;	OR		C 
+80d3			;	JR		NZ,read_loop 
+80d3			 
+80d3 21 00 30			LD		HL,0x3000 
+80d6 06 10			LD		B,16 
+80d8 11 80 f0			LD		DE,0xF080 
+80db cd eb 80			CALL	hexdump 
+80de			 
+80de cd fe 82			call	wait_key 
+80e1			 
+80e1 3a 00 70			LD		A,(CYL) 
+80e4 3c				INC		A 
+80e5 32 00 70			LD		(CYL),A 
+80e8			 
+80e8 c3 91 80			jp		read_test 
+80eb			 
+80eb			 
+80eb			hexdump: 
+80eb 7e			        LD      A,(HL) 
+80ec cd 4d 83		        CALL    prt_hex_byte 
+80ef 23			        INC     HL 
+80f0 13			        INC     DE 
+80f1 10 f8		        DJNZ    hexdump 
+80f3 c9			        RET 
+80f4			 
+80f4			 
+80f4			 
+80f4			GEO_TESTS: 
+80f4			 
+80f4 cd fe 82			CALL	wait_key 
+80f7			 
+80f7				; Test calculation of cluster number 
+80f7 3e 02			LD		A,2				; Sector 2 
+80f9 d3 43			OUT		(0x43),A 
+80fb 3e 02			LD		A,2				; Track low 
+80fd d3 44			OUT		(0x44),A 
+80ff 3e 00			LD		A,0				; Track high 
+8101 d3 45			OUT		(0x45),A 
+8103 3e 08			LD		A,00001000b		; SDH (drive 1/head 0)  HD0 
+8105 d3 46			OUT		(0x46),A 
+8107 3e 90			LD		A,0x90			; Invoke  
+8109 d3 47			OUT		(0x47),A	 
+810b cd fe 82			CALL 	wait_key		;; Should show 0x89 
+810e			 
+810e				; Test calculation of cluster number 
+810e 3e 02			LD		A,2				; Sector 2 
+8110 d3 43			OUT		(0x43),A 
+8112 3e 02			LD		A,2				; Track low 
+8114 d3 44			OUT		(0x44),A 
+8116 3e 00			LD		A,0				; Track high 
+8118 d3 45			OUT		(0x45),A 
+811a 3e 0a			LD		A,00001010b		; SDH (drive 1/head 0)  HD0 
+811c d3 46			OUT		(0x46),A 
+811e 3e 90			LD		A,0x90			; Invoke  
+8120 d3 47			OUT		(0x47),A	 
+8122 cd fe 82			CALL 	wait_key		;; Should show 0xAB 
+8125			 
+8125				; Test calculation of cluster number 
+8125 3e 02			LD		A,2				; Sector 2 
+8127 d3 43			OUT		(0x43),A 
+8129 3e 33			LD		A,0x33			; Track low 
+812b d3 44			OUT		(0x44),A 
+812d 3e 01			LD		A,0x01			; Track high 
+812f d3 45			OUT		(0x45),A 
+8131 3e 0b			LD		A,00001011b		; SDH (drive 1/head 0)  HD0 
+8133 d3 46			OUT		(0x46),A 
+8135 3e 90			LD		A,0x90			; Invoke  
+8137 d3 47			OUT		(0x47),A	 
+8139 cd fe 82			CALL 	wait_key		;; Should show error (ubee512 doesn't though as relies on OS eof check) 
+813c			 
+813c				; Test calculation of cluster number 
+813c 3e 02			LD		A,2				; Sector 2 
+813e d3 43			OUT		(0x43),A 
+8140 3e 02			LD		A,2				; Track low 
+8142 d3 44			OUT		(0x44),A 
+8144 3e 01			LD		A,1				; Track high 
+8146 d3 45			OUT		(0x45),A 
+8148 3e 0b			LD		A,00001011b		; SDH (drive 1/head 0)  HD0 
+814a d3 46			OUT		(0x46),A 
+814c 3e 90			LD		A,0x90			; Invoke  
+814e d3 47			OUT		(0x47),A	 
+8150 cd fe 82			CALL 	wait_key		;; Should show 44bc 
+8153			 
+8153				; Test calculation of cluster number 
+8153 3e 17			LD		A,23			; Sector 23 
+8155 d3 43			OUT		(0x43),A 
+8157 3e 02			LD		A,2				; Track low 
+8159 d3 44			OUT		(0x44),A 
+815b 3e 00			LD		A,0				; Track high 
+815d d3 45			OUT		(0x45),A 
+815f 3e 18			LD		A,00011000b		; SDH (fdd 1/head 0)   DS80 
+8161 d3 46			OUT		(0x46),A 
+8163 3e 90			LD		A,0x90			; Invoke  
+8165 d3 47			OUT		(0x47),A	 
+8167 cd fe 82			CALL 	wait_key		; Should show 0x2a 
+816a			 
+816a			 
+816a				; Test calculation of cluster number 
+816a 3e 02			LD		A,2				; Sector 2 
+816c d3 43			OUT		(0x43),A 
+816e 3e 02			LD		A,2				; Track low 
+8170 d3 44			OUT		(0x44),A 
+8172 3e 00			LD		A,0				; Track high 
+8174 d3 45			OUT		(0x45),A 
+8176 3e 18			LD		A,00011000b		; SDH (fdd 1/head 0)   DS80 
+8178 d3 46			OUT		(0x46),A 
+817a 3e 90			LD		A,0x90			; Invoke  
+817c d3 47			OUT		(0x47),A	 
+817e cd fe 82			CALL 	wait_key		; Should show error 
+8181			 
+8181			 
+8181				; Test calculation of cluster number 
+8181 3e 02			LD		A,2				; Sector 2 
+8183 d3 43			OUT		(0x43),A 
+8185 3e 01			LD		A,1				; Track low 
+8187 d3 44			OUT		(0x44),A 
+8189 3e 00			LD		A,0				; Track high 
+818b d3 45			OUT		(0x45),A 
+818d 3e 18			LD		A,00011000b		; SDH (fdd 1/head 0)   DS80 
+818f d3 46			OUT		(0x46),A 
+8191 3e 90			LD		A,0x90			; Invoke  
+8193 d3 47			OUT		(0x47),A	 
+8195 cd fe 82			CALL 	wait_key		; Should show 0x15 
+8198			 
+8198 c9				RET 
+8199			 
+8199			CHECK_Z: 
+8199 3e 06			LD		A,6 
+819b 28 02			JR		Z,L_write 
+819d 3e 05			LD		A,5 
+819f			L_write: 
+819f dd 77 00			LD		(IX+0),A 
+81a2 dd 23			INC		IX 
+81a4 c9				RET 
+81a5			 
+81a5			CHECK_NZ: 
+81a5 3e 06			LD		A,6 
+81a7 20 f6			JR		NZ,L_write 
+81a9 3e 05			LD		A,5 
+81ab 18 f2			JR		L_write 
+81ad			 
+81ad			 
+81ad			WRITE_TEST: 
+81ad				; Setup task file 
+81ad 3e 01		 	LD		A,1				; Sector 1 
+81af d3 43			OUT		(0x43),A 
+81b1 3e 1c			LD		A,28			; Track Low 
+81b3 d3 44			OUT		(0x44),A 
+81b5 3e 00			LD		A,0				; Track High 
+81b7 d3 45			OUT		(0x45),A 
+81b9 3e 28			LD		A,00101000b		; SIZE=512,HDD=1,HEAD=0 
+81bb d3 46			OUT		(0x46),A 
+81bd 3e 30			LD		A,0x30			; Invoke Write Common 
+81bf d3 47			OUT		(0x47),A 
+81c1			 
+81c1				; Write the data 
+81c1 01 00 02			LD		BC,512 
+81c4			write_loop: 
+81c4 3e 06			LD		A,6 
+81c6 d3 40			OUT		(40h),A 
+81c8 0b				DEC		BC 
+81c9 78				LD		A,B 
+81ca b1				OR		C 
+81cb 20 f7			JR		NZ,write_loop 
+81cd			 
+81cd 21 00 00			LD		HL,0 
+81d0			wait_write: 
+81d0 db 47			IN		A,(0x47) 
+81d2 e6 80			AND		0x80 
+81d4 23				INC		HL 
+81d5 20 f9			JR		NZ,wait_write 
+81d7			 
+81d7 11 28 f0			LD		DE,0xF028 
+81da cd 0d 83			CALL 	prt_int_word 
+81dd c9				RET 
+81de			 
+81de			 
+81de			 
+81de			 
+81de			MSG: 
+81de ..				DB	"Disk Controller Testing" 
+81f5			;	DB	"Disk Test: -- 89 AB -- 44bc 2A -- 15 " 
+81f5			MSG_END: 
+81f5			 
+81f5			 
+81f5			 
+81f5			include "CommonDefs.asm" 
+81f5			COLOR_RAM_BASE:		EQU	0xF800 
+81f5			PCG_RAM_BASE:		EQU 0xF800 
+81f5			CHAR_RAM_BASE:		EQU 0xF000 
+81f5			ATTR_RAM_BASE:		EQU 0F000h 
+81f5			 
+81f5			COLOR_BLACK:		EQU 0 
+81f5			COLOR_DARK_RED:     EQU 1 
+81f5			COLOR_DARK_GREEN:   EQU 2 
+81f5			COLOR_BROWN:        EQU 3 
+81f5			COLOR_DARK_BLUE:    EQU 4 
+81f5			COLOR_DARK_MAGENTA: EQU 5 
+81f5			COLOR_DARK_CYAN:    EQU 6 
+81f5			COLOR_LIGHT_GREY:   EQU 7 
+81f5			COLOR_DARK_GREY:    EQU 8 
+81f5			COLOR_RED:          EQU 9 
+81f5			COLOR_GREEN:        EQU 10 
+81f5			COLOR_YELLOW:       EQU 11 
+81f5			COLOR_BLUE:         EQU 12 
+81f5			COLOR_MAGENTA:      EQU 13 
+81f5			COLOR_CYAN:         EQU 14 
+81f5			COLOR_WHITE:        EQU 15 
+81f5			 
+81f5			; Color RAM support 
+81f5			PORT_COLOR_RAM:				EQU 08h 
+81f5			COLOR_RAM_DISABLE:			EQU 00h 
+81f5			COLOR_RAM_ENABLE:			EQU 40h 
+81f5			 
+81f5			; Video Memory Latch 
+81f5			PORT_VIDEO_MEMORY_LATCH:	EQU	1Ch 
+81f5			VML_BANK_SELECT_MASK:		EQU 0Fh 
+81f5			VML_CHARACTER_RAM_ENABLE:	EQU 00h 
+81f5			VML_ATTRIBUTE_RAM_ENABLE:	EQU 10h 
+81f5			VML_EXTENDED_GRAPHICS:		EQU 80h 
+81f5			 
+81f5			; Attributes 
+81f5			ATTR_PCG_BANK_SELECT_MASK:	EQU 0Fh 
+81f5			 
+81f5			KEY_LEFT:     EQU 59 
+81f5			KEY_RIGHT:    EQU 62 
+81f5			KEY_COMMA:    EQU 44 
+81f5			KEY_PERIOD:   EQU 46 
+81f5			KEY_SPACE:    EQU 55 
+81f5			KEY_ENTER:    EQU 52 
+81f5			KEY_1:        EQU 33 
+81f5			KEY_2:        EQU 34 
+81f5			KEY_ESCAPE:   EQU 48 
+81f5			 
+81f5			 
+81f5			; Various CRTC configurations 
+81f5			 
+81f5			CRTC_Registers_64_16:   
+81f5 6b 40 51 37 12 09 10 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x10,0x12 
+81fd 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+8205			 
+8205			CRTC_Registers_64_16_b:   
+8205 6b 40 51 37 12 09 10 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x10,0x12 
+820d 48 0a 2f 0f 20 00 00 00		DB  0x48,0x0A,0x2F,0x0F,0x20,0x00,0x00,0x00 
+8215			 
+8215			CRTC_Registers_64_17:   
+8215 6b 40 51 37 12 09 11 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x11,0x12 
+821d 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+8225			 
+8225			CRTC_Registers_64_18:   
+8225 6b 40 51 37 12 09 12 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x12,0x12 
+822d 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+8235			 
+8235			CRTC_Registers_40_25: 
+8235 35 28 2d 24 1b 05 19 1a		DB	0x35,0x28,0x2D,0x24,0x1B,0x05,0x19,0x1A 
+823d 48 0a 2a 0a 00 00 00 00		DB  0x48,0x0A,0x2A,0x0A,0x00,0x00,0x00,0x00 
+8245			 
+8245			CRTC_Registers_80_16: 
+8245 6b 50 59 37 12 09 10 12		DB	0x6B,0x50,0x59,0x37,0x12,0x09,0x10,0x12 
+824d 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+8255			 
+8255			CRTC_Registers_80_24: 
+8255 6b 50 58 37 1b 05 18 1a		DB	0x6B,0x50,0x58,0x37,0x1B,0x05,0x18,0x1A 
+825d 48 0a 2a 0a 20 00 00 00		DB  0x48,0x0A,0x2A,0x0A,0x20,0x00,0x00,0x00 
+8265			 
+8265			CRTC_Registers_80_25: 
+8265 6b 50 58 37 1b 05 19 1a		DB	0x6B,0x50,0x58,0x37,0x1B,0x05,0x19,0x1A 
+826d 48 0a 09 0a 20 00 00 00		DB  0x48,0x0A,0x09,0x0A,0x20,0x00,0x00,0x00 
+8275			 
+8275			 
+8275			; Clear the screen 
+8275			clear_screen: 
+8275 3e 20				LD		A,' ' 
+8277 21 00 f0				LD		HL,CHAR_RAM_BASE 
+827a 11 01 f0				LD		DE,CHAR_RAM_BASE+1 
+827d 01 ff 07				LD		BC,0x800-1 
+8280 77					LD      (HL),A 
+8281 ed b0				LDIR 
+8283 c9					RET 
+8284			 
+8284			; Clear attribute RAM 
+8284			clear_attribute_buffer: 
+8284 3e 10				LD		A,VML_ATTRIBUTE_RAM_ENABLE 
+8286 d3 1c				OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+8288 3e 00				LD		A,0 
+828a 21 00 f0				LD		HL,ATTR_RAM_BASE 
+828d 11 01 f0				LD		DE,ATTR_RAM_BASE+1 
+8290 01 ff 07				LD		BC,0x800-1 
+8293 77					LD      (HL),A 
+8294 ed b0				LDIR 
+8296 3e 00				LD		A,VML_CHARACTER_RAM_ENABLE 
+8298 d3 1c				OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+829a c9					RET 
+829b			 
+829b			; Fill colour buffer with A 
+829b			clear_color_buffer:	 
+829b f5					PUSH	AF 
+829c 3e 40				LD		A, COLOR_RAM_ENABLE 
+829e d3 08				OUT     (PORT_COLOR_RAM),A 
+82a0 21 00 f8				LD		HL,COLOR_RAM_BASE 
+82a3 11 01 f8				LD		DE,COLOR_RAM_BASE+1 
+82a6 01 ff 07				LD		BC,0x800-1 
+82a9 f1					POP		AF 
+82aa 77					LD		(HL),A 
+82ab ed b0				LDIR 
+82ad 3e 00				LD		A,COLOR_RAM_DISABLE 
+82af d3 08				OUT		(PORT_COLOR_RAM),A 
+82b1 c9					RET 
+82b2			 
+82b2			; Helper to load CRTC with register values pointed to by HL 
+82b2			setup_crtc: 
+82b2 0e 00				LD		C,0 
+82b4 06 10				LD		B,16 
+82b6			L1: 
+82b6 79					LD		A,C 
+82b7 d3 0c				OUT		(0CH),A 
+82b9 7e					LD		A,(HL) 
+82ba d3 0d				OUT		(0DH),A 
+82bc 0c					INC		C 
+82bd 23					INC		HL 
+82be 10 f6				DJNZ	L1 
+82c0 c9					RET 
+82c1			 
+82c1			is_key_down:   
+82c1 c5					PUSH    BC 
+82c2 4f					LD      C,A 
+82c3 47					LD      B,A 
+82c4 3e 12				LD      A,12h 
+82c6 d3 0c				OUT     (0Ch),A 
+82c8 78					LD      A,B 
+82c9 0f					RRCA 
+82ca 0f					RRCA 
+82cb 0f					RRCA 
+82cc 0f					RRCA 
+82cd e6 03				AND     03h 
+82cf d3 0d				OUT     (0Dh),A 
+82d1 3e 13				LD      A,13h 
+82d3 d3 0c				OUT     (0Ch),A 
+82d5 78					LD      A,B 
+82d6 07					RLCA 
+82d7 07					RLCA 
+82d8 07					RLCA 
+82d9 07					RLCA 
+82da d3 0d				OUT     (0Dh),A 
+82dc 3e 01				LD      A,01h 
+82de d3 0b				OUT     (0Bh),A 
+82e0 3e 10				LD      A,10h 
+82e2 d3 0c				OUT     (0Ch),A 
+82e4 db 0d				IN      A,(0Dh) 
+82e6 3e 1f				LD      A,1Fh 
+82e8 d3 0c				OUT     (0Ch),A 
+82ea d3 0d				OUT     (0Dh),A 
+82ec db 0c		L095D: 	IN      A,(0Ch) 
+82ee cb 7f				BIT     7,A 
+82f0 28 fa				JR      Z,L095D 
+82f2 db 0c				IN      A,(0Ch) 
+82f4 2f					CPL 
+82f5 cb 77				BIT     6,A 
+82f7 3e 00				LD      A,00h 
+82f9 d3 0b				OUT     (0Bh),A 
+82fb 79					LD      A,C 
+82fc c1					POP     BC 
+82fd c9					RET 
+82fe			 
+82fe			 
+82fe			;; Wait for space key 
+82fe			wait_key: 
+82fe 3e 37			LD		A,KEY_SPACE 
+8300 cd c1 82			CALL	is_key_down 
+8303 20 f9			JR		NZ,wait_key 
+8305			 
+8305			L_wait2: 
+8305 3e 37			LD		A,KEY_SPACE 
+8307 cd c1 82			CALL	is_key_down 
+830a 28 f9			JR		Z,L_wait2 
+830c c9				RET 
+830d			 
+830d			 
+830d					; print integer in HL to DE 
+830d			prt_int_word: 
+830d 3e 30				LD		A,'0' 
+830f 32 20 70				LD		(LIB_SCRATCH+0),A 
+8312 01 f0 d8				ld		bc,-10000 
+8315 cd 2e 83				call	Num1 
+8318 01 18 fc				ld		bc,-1000 
+831b cd 2e 83				call	Num1 
+831e 01 9c ff				ld		bc,-100 
+8321 cd 2e 83				call	Num1 
+8324 0e f6				ld		c,-10 
+8326 cd 2e 83				call	Num1 
+8329 48					ld		c,b 
+832a af					XOR		A 
+832b 32 20 70				LD		(LIB_SCRATCH+0),A 
+832e			 
+832e			Num1:		 
+832e 3e 2f				ld		a,'0'-1 
+8330			Num2:	 
+8330 3c					inc		a 
+8331 09					add		hl,bc 
+8332 38 fc				jr		c,Num2 
+8334 ed 42				sbc		hl,bc 
+8336			 
+8336 4f					LD		C,A 
+8337 3a 20 70				LD		A,(LIB_SCRATCH+0) 
+833a b9					cp		C 
+833b c8					ret		Z 
+833c 79					LD		A,C 
+833d			 
+833d 12					ld		(de),A 
+833e 13					inc		de 
+833f af					XOR		A 
+8340 32 20 70				LD		(LIB_SCRATCH+0),A 
+8343 c9					ret 
+8344			 
+8344					; print hex word in HL to DE 
+8344			prt_hex_word: 
+8344 7c					LD		A,H 
+8345 cd 4d 83				CALL	prt_hex_byte 
+8348 7d					LD		A,L 
+8349 cd 4d 83				CALL	prt_hex_byte 
+834c c9					ret 
+834d			 
+834d					; print hex byte in A to DE 
+834d			prt_hex_byte: 
+834d f5					PUSH	AF 
+834e cb 3f				SRL		A 
+8350 cb 3f				SRL		A 
+8352 cb 3f				SRL		A 
+8354 cb 3f				SRL		A 
+8356 cd 5a 83				CALL	prt_hex_nib 
+8359 f1					POP		AF 
+835a					;; fall through 
+835a			 
+835a			 
+835a					; print low nibble of A to DE 
+835a			prt_hex_nib: 
+835a e6 0f				and     0xF 
+835c fe 0a				cp      0xA 
+835e 38 05				jr      c,lt10 
+8360 c6 37				add		'A' - 0xA; 
+8362 12					ld		(de),a 
+8363 13					inc		de 
+8364 c9					ret 
+8365			lt10: 
+8365 c6 30				add		'0' 
+8367 12					ld		(de),a 
+8368 13					inc		de 
+8369 c9					ret; 
+836a			 
+836a			 
+# End of file CommonDefs.asm
+836a			 
+# End of file DiskTestRom.asm
+836a

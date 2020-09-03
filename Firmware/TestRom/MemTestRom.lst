@@ -1,0 +1,554 @@
+# File MemTestRom.asm
+0000					ORG			08000h 
+8000			 
+8000			RAM_BASE:			EQU		7000h 
+8000			LIB_SCRATCH:		EQU		RAM_BASE 
+8000			 
+8000			START: 
+8000 31 00 80			LD		SP,0x8000 
+8003			 
+8003 21 c2 81			LD		HL,CRTC_Registers_64_16 
+8006 cd 7f 82			CALL	setup_crtc 
+8009			 
+8009 cd 42 82			CALL	clear_screen 
+800c 3e 0b			LD		A,COLOR_YELLOW 
+800e cd 68 82			CALL	clear_color_buffer 
+8011 cd 51 82			CALL	clear_attribute_buffer 
+8014			 
+8014				; Copy letters to RAM (testing) 
+8014 11 00 f0			LD		DE,CHAR_RAM_BASE 
+8017 21 a5 81			LD		HL,MSG 
+801a 01 1d 00			LD		BC,MSG_END-MSG 
+801d ed b0			LDIR  
+801f			 
+801f				; --- setup each bank with signature --- 
+801f dd 21 40 f0		LD		IX,CHAR_RAM_BASE+0x40 
+8023 fd 21 00 10		LD		IY,0x1000 
+8027			 
+8027 3e 00			LD		A,00000000b			;; Bank 0 Lower 
+8029 d3 50			OUT		(50h),A 
+802b fd 36 00 61		LD		(IY+0),'a' 
+802f			 
+802f 3e 01			LD		A,00000001b			;; Bank 0 Upper 
+8031 d3 50			OUT		(50h),A 
+8033 fd 36 00 41		LD		(IY+0),'A' 
+8037			 
+8037 3e 02			LD		A,00000010b			;; Bank 1 Lower 
+8039 d3 50			OUT		(50h),A 
+803b fd 36 00 62		LD		(IY+0),'b' 
+803f			 
+803f 3e 03			LD		A,00000011b			;; Bank 1 Upper 
+8041 d3 50			OUT		(50h),A 
+8043 fd 36 00 42		LD		(IY+0),'B' 
+8047			 
+8047				; --- Now test --- 
+8047 3e 00			LD		A,00000000b			;; Bank 0 Lower 
+8049 d3 50			OUT		(50h),A 
+804b 06 61			LD		B,'a' 
+804d cd 68 81			CALL	CHECK 
+8050			 
+8050 3e 01			LD		A,00000001b			;; Bank 0 Upper 
+8052 d3 50			OUT		(50h),A 
+8054 06 41			LD		B,'A' 
+8056 cd 68 81			CALL	CHECK 
+8059			 
+8059 3e 02			LD		A,00000010b			;; Bank 1 Lower 
+805b d3 50			OUT		(50h),A 
+805d 06 62			LD		B,'b' 
+805f cd 68 81			CALL	CHECK 
+8062			 
+8062 3e 03			LD		A,00000011b			;; Bank 1 Upper 
+8064 d3 50			OUT		(50h),A 
+8066 06 42			LD		B,'B' 
+8068 cd 68 81			CALL	CHECK 
+806b			 
+806b dd 23			INC		IX					;; Space 
+806d			 
+806d 3e 00			LD		A,00000000b			;; Starting bank 
+806f 06 06			LD		B,00000110b			;; Target bank 
+8071 cd 80 81			CALL	GET_HILOW_SIGS 
+8074 26 61			LD		H,'a' 
+8076 2e 61			LD		L,'a' 
+8078 cd 5d 81			CALL	CHECK_HILOW_SIGS 
+807b			 
+807b 3e 01			LD		A,00000001b			;; Starting bank 
+807d 06 07			LD		B,00000111b			;; Target bank 
+807f cd 80 81			CALL	GET_HILOW_SIGS 
+8082 26 61			LD		H,'a' 
+8084 2e 41			LD		L,'A' 
+8086 cd 5d 81			CALL	CHECK_HILOW_SIGS 
+8089			 
+8089 3e 02			LD		A,00000010b			;; Starting bank 
+808b 06 04			LD		B,00000100b			;; Target bank 
+808d cd 80 81			CALL	GET_HILOW_SIGS 
+8090 26 61			LD		H,'a' 
+8092 2e 62			LD		L,'b' 
+8094 cd 5d 81			CALL	CHECK_HILOW_SIGS 
+8097			 
+8097 3e 03			LD		A,00000011b			;; Starting bank 
+8099 06 05			LD		B,00000101b			;; Target bank 
+809b cd 80 81			CALL	GET_HILOW_SIGS 
+809e 26 61			LD		H,'a' 
+80a0 2e 42			LD		L,'B' 
+80a2 cd 5d 81			CALL	CHECK_HILOW_SIGS 
+80a5			 
+80a5 dd 23			INC		IX					;; Space 
+80a7 3e 00			LD		A,0 
+80a9 d3 50			OUT		(50h),a 
+80ab			 
+80ab				; Latch character ROM 
+80ab 3e 01			LD		A,1 
+80ad d3 0b			OUT		(0bh),A 
+80af			 
+80af				; Test read/write to charrom 
+80af 3e 43			LD		A,'C' 
+80b1 32 06 f0			LD		(0xF006),A			;; write to character ram (should fail) 
+80b4 3e 50			LD		A,'P' 
+80b6 32 06 f8			LD		(0xF806),A			;; write to pcg ram (should succeed) 
+80b9 3a 06 f0			LD		A,(0xF006) 
+80bc fe 41			CP		0x41				;; Charrom found 
+80be 3e 00			LD		A,0 
+80c0 d3 0b			OUT		(0bh),a 
+80c2 cd 6c 81			CALL	CHECK_Z 
+80c5			 
+80c5				; Latch character ROM 
+80c5 3e 01			LD		A,1 
+80c7 d3 0b			OUT		(0bh),A 
+80c9			 
+80c9 21 d7 80			LD		HL,PROXY_1 
+80cc 11 00 70			LD		DE,0x7000 
+80cf 01 17 00			LD		BC,PROXY_1_END - PROXY_1 
+80d2 ed b0			LDIR 
+80d4 c3 00 70			JP		0x7000 
+80d7			 
+80d7			PROXY_1: 
+80d7				; Switch to alternative video ram address 
+80d7 3e 10			LD		A,0x10 
+80d9 d3 50			OUT		(0x50),A 
+80db 3e 43			LD		A,'C' 
+80dd 32 06 80			LD		(0x8006),A 
+80e0 3a 06 80			LD		A,(0x8006) 
+80e3 fe 41			CP		0x41 
+80e5 3e 00			LD		A,0 
+80e7 d3 50			OUT		(50h),a 
+80e9 d3 0b			OUT		(0bh),a 
+80eb c3 ee 80			JP		PROXY_1_END 
+80ee			PROXY_1_END: 
+80ee cd 6c 81			CALL	CHECK_Z 
+80f1			 
+80f1 dd 23			INC		IX 
+80f3			 
+80f3				; Check that the byte at 0xF006 wasn't actually written 
+80f3				; (should only be able to write to the pcg part of video ram) 
+80f3 3a 06 f0			LD		A,(0xF006) 
+80f6 fe 43			CP		'C' 
+80f8 cd 78 81			CALL	CHECK_NZ 
+80fb			 
+80fb 3a 06 f8			LD		A,(0xF806) 
+80fe fe 50			CP		'P' 
+8100 cd 6c 81			CALL	CHECK_Z 
+8103			 
+8103 3e 00			LD		A,0 
+8105 d3 50			OUT		(50h),A 
+8107			 
+8107 dd 23			INC		IX 
+8109			 
+8109				; Write something to PCG RAM Beyond 16K 
+8109 3e 88			LD		A,088h 
+810b d3 1c			OUT		(0x1c),A 
+810d			 
+810d 3e c7			LD		A,0c7h 
+810f 32 00 f8			LD		(0xF800),A 
+8112			 
+8112 3a 00 f8			LD		A,(0xF800) 
+8115 fe c7			CP		0c7h 
+8117 cd 78 81			CALL	CHECK_NZ 
+811a			 
+811a			 
+811a			 
+811a			 
+811a 11 c0 f0		        LD      DE,0xF0c0 
+811d 21 00 90		        LD      HL,0x9000 
+8120 06 10		        LD      B,16 
+8122 cd 54 81		        CALL	hexdump 
+8125			 
+8125 11 00 f1		        LD      DE,0xF100 
+8128 21 00 b1		        LD      HL,0xb100 
+812b 06 10		        LD      B,16 
+812d cd 54 81		        call	hexdump 
+8130			 
+8130 3e 00		        LD		A,0 
+8132 d3 50		        OUT		(50h),A 
+8134 3e 01		        LD		A,1 
+8136 d3 0b		        OUT		(0Bh),A 
+8138 21 10 fc		        LD		HL,0xFC10 
+813b 11 00 30		        LD		DE,0x3000 
+813e 01 10 00		        LD		BC,16 
+8141 ed b0		        LDIR 
+8143 3e 00		        LD		A,0 
+8145 d3 0b		        OUT		(0Bh),A 
+8147			 
+8147 21 00 30		        LD		HL,0x3000 
+814a 11 40 f1		        LD		DE,0xF140 
+814d 06 10		        LD		B,16 
+814f cd 54 81		        call	hexdump 
+8152			 
+8152 18 fe		        JR      $ 
+8154			 
+8154			hexdump: 
+8154 7e			        LD      A,(HL) 
+8155 cd 1a 83		        CALL    prt_hex_byte 
+8158 23			        INC     HL 
+8159 13			        INC     DE 
+815a 10 f8		        DJNZ    hexdump 
+815c c9			        RET 
+815d			 
+815d			 
+815d			CHECK_HILOW_SIGS: 
+815d 7a				LD		A,D 
+815e bc				CP		H 
+815f cd 6c 81			CALL	CHECK_Z 
+8162 7b				LD		A,E 
+8163 bd				CP		L 
+8164 cd 6c 81			CALL	CHECK_Z 
+8167 c9				RET 
+8168			 
+8168			CHAR_CHECK:	EQU	6 
+8168			CHAR_CROSS:	EQU 5 
+8168			 
+8168			CHECK: 
+8168 fd 7e 00			LD		A,(IY+0) 
+816b b8				CP		B 
+816c			CHECK_Z: 
+816c 3e 06			LD		A,CHAR_CHECK 
+816e 28 02			JR		Z,L_write 
+8170 3e 05			LD		A,CHAR_CROSS 
+8172			L_write: 
+8172 dd 77 00			LD		(IX+0),A 
+8175 dd 23			INC		IX 
+8177 c9				RET 
+8178			 
+8178			CHECK_NZ: 
+8178 3e 06			LD		A,CHAR_CHECK 
+817a 20 f6			JR		NZ,L_write 
+817c 3e 05			LD		A,CHAR_CROSS 
+817e 18 f2			JR		L_write 
+8180			 
+8180			 
+8180			GET_HILOW_SIGS: 
+8180 e1				POP		HL			; Move return address to the returning bank 
+8181 d3 50			OUT		(50h),A 
+8183 e5				PUSH	HL 
+8184			 
+8184				; Copy the routine to read hi ram to loram 
+8184 c5				PUSH	BC 
+8185 21 95 81			LD		HL,GET_HILOW_SIGS_STUB 
+8188 11 00 20			LD		DE,0x2000 
+818b 01 10 00			LD		BC,GET_HILOW_SIGS_STUB_END - GET_HILOW_SIGS_STUB 
+818e ed b0			LDIR 
+8190 c1				POP		BC 
+8191 cd 00 20			CALL	0x2000 
+8194 c9				RET 
+8195			 
+8195			GET_HILOW_SIGS_STUB: 
+8195				; This routine will be moved to RAM to run 
+8195			 
+8195				; Switch to target bank layout 
+8195 4f				LD		C,A 
+8196 78				LD		A,B 
+8197 d3 50			OUT		(50h),A 
+8199			 
+8199				; Read hi/lo signatures 
+8199 3a 00 90			LD		A,(0x9000) 
+819c 57				LD		D,A 
+819d 3a 00 10			LD		A,(0x1000) 
+81a0 5f				LD		E,A 
+81a1			 
+81a1				; Switch back to starting bank 
+81a1 79				LD		A,C 
+81a2 d3 50			OUT		(50h),A 
+81a4			 
+81a4				; Return  
+81a4 c9				RET 
+81a5			GET_HILOW_SIGS_STUB_END: 
+81a5			 
+81a5			 
+81a5			MSG: 
+81a5 ..				DB	"Testing Memory Bank Switching" 
+81c2			MSG_END: 
+81c2			 
+81c2			 
+81c2			 
+81c2			include "CommonDefs.asm" 
+81c2			COLOR_RAM_BASE:		EQU	0xF800 
+81c2			PCG_RAM_BASE:		EQU 0xF800 
+81c2			CHAR_RAM_BASE:		EQU 0xF000 
+81c2			ATTR_RAM_BASE:		EQU 0F000h 
+81c2			 
+81c2			COLOR_BLACK:		EQU 0 
+81c2			COLOR_DARK_RED:     EQU 1 
+81c2			COLOR_DARK_GREEN:   EQU 2 
+81c2			COLOR_BROWN:        EQU 3 
+81c2			COLOR_DARK_BLUE:    EQU 4 
+81c2			COLOR_DARK_MAGENTA: EQU 5 
+81c2			COLOR_DARK_CYAN:    EQU 6 
+81c2			COLOR_LIGHT_GREY:   EQU 7 
+81c2			COLOR_DARK_GREY:    EQU 8 
+81c2			COLOR_RED:          EQU 9 
+81c2			COLOR_GREEN:        EQU 10 
+81c2			COLOR_YELLOW:       EQU 11 
+81c2			COLOR_BLUE:         EQU 12 
+81c2			COLOR_MAGENTA:      EQU 13 
+81c2			COLOR_CYAN:         EQU 14 
+81c2			COLOR_WHITE:        EQU 15 
+81c2			 
+81c2			; Color RAM support 
+81c2			PORT_COLOR_RAM:				EQU 08h 
+81c2			COLOR_RAM_DISABLE:			EQU 00h 
+81c2			COLOR_RAM_ENABLE:			EQU 40h 
+81c2			 
+81c2			; Video Memory Latch 
+81c2			PORT_VIDEO_MEMORY_LATCH:	EQU	1Ch 
+81c2			VML_BANK_SELECT_MASK:		EQU 0Fh 
+81c2			VML_CHARACTER_RAM_ENABLE:	EQU 00h 
+81c2			VML_ATTRIBUTE_RAM_ENABLE:	EQU 10h 
+81c2			VML_EXTENDED_GRAPHICS:		EQU 80h 
+81c2			 
+81c2			; Attributes 
+81c2			ATTR_PCG_BANK_SELECT_MASK:	EQU 0Fh 
+81c2			 
+81c2			KEY_LEFT:     EQU 59 
+81c2			KEY_RIGHT:    EQU 62 
+81c2			KEY_COMMA:    EQU 44 
+81c2			KEY_PERIOD:   EQU 46 
+81c2			KEY_SPACE:    EQU 55 
+81c2			KEY_ENTER:    EQU 52 
+81c2			KEY_1:        EQU 33 
+81c2			KEY_2:        EQU 34 
+81c2			KEY_ESCAPE:   EQU 48 
+81c2			 
+81c2			 
+81c2			; Various CRTC configurations 
+81c2			 
+81c2			CRTC_Registers_64_16:   
+81c2 6b 40 51 37 12 09 10 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x10,0x12 
+81ca 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+81d2			 
+81d2			CRTC_Registers_64_16_b:   
+81d2 6b 40 51 37 12 09 10 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x10,0x12 
+81da 48 0a 2f 0f 20 00 00 00		DB  0x48,0x0A,0x2F,0x0F,0x20,0x00,0x00,0x00 
+81e2			 
+81e2			CRTC_Registers_64_17:   
+81e2 6b 40 51 37 12 09 11 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x11,0x12 
+81ea 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+81f2			 
+81f2			CRTC_Registers_64_18:   
+81f2 6b 40 51 37 12 09 12 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x12,0x12 
+81fa 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+8202			 
+8202			CRTC_Registers_40_25: 
+8202 35 28 2d 24 1b 05 19 1a		DB	0x35,0x28,0x2D,0x24,0x1B,0x05,0x19,0x1A 
+820a 48 0a 2a 0a 00 00 00 00		DB  0x48,0x0A,0x2A,0x0A,0x00,0x00,0x00,0x00 
+8212			 
+8212			CRTC_Registers_80_16: 
+8212 6b 50 59 37 12 09 10 12		DB	0x6B,0x50,0x59,0x37,0x12,0x09,0x10,0x12 
+821a 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+8222			 
+8222			CRTC_Registers_80_24: 
+8222 6b 50 58 37 1b 05 18 1a		DB	0x6B,0x50,0x58,0x37,0x1B,0x05,0x18,0x1A 
+822a 48 0a 2a 0a 20 00 00 00		DB  0x48,0x0A,0x2A,0x0A,0x20,0x00,0x00,0x00 
+8232			 
+8232			CRTC_Registers_80_25: 
+8232 6b 50 58 37 1b 05 19 1a		DB	0x6B,0x50,0x58,0x37,0x1B,0x05,0x19,0x1A 
+823a 48 0a 09 0a 20 00 00 00		DB  0x48,0x0A,0x09,0x0A,0x20,0x00,0x00,0x00 
+8242			 
+8242			 
+8242			; Clear the screen 
+8242			clear_screen: 
+8242 3e 20				LD		A,' ' 
+8244 21 00 f0				LD		HL,CHAR_RAM_BASE 
+8247 11 01 f0				LD		DE,CHAR_RAM_BASE+1 
+824a 01 ff 07				LD		BC,0x800-1 
+824d 77					LD      (HL),A 
+824e ed b0				LDIR 
+8250 c9					RET 
+8251			 
+8251			; Clear attribute RAM 
+8251			clear_attribute_buffer: 
+8251 3e 10				LD		A,VML_ATTRIBUTE_RAM_ENABLE 
+8253 d3 1c				OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+8255 3e 00				LD		A,0 
+8257 21 00 f0				LD		HL,ATTR_RAM_BASE 
+825a 11 01 f0				LD		DE,ATTR_RAM_BASE+1 
+825d 01 ff 07				LD		BC,0x800-1 
+8260 77					LD      (HL),A 
+8261 ed b0				LDIR 
+8263 3e 00				LD		A,VML_CHARACTER_RAM_ENABLE 
+8265 d3 1c				OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+8267 c9					RET 
+8268			 
+8268			; Fill colour buffer with A 
+8268			clear_color_buffer:	 
+8268 f5					PUSH	AF 
+8269 3e 40				LD		A, COLOR_RAM_ENABLE 
+826b d3 08				OUT     (PORT_COLOR_RAM),A 
+826d 21 00 f8				LD		HL,COLOR_RAM_BASE 
+8270 11 01 f8				LD		DE,COLOR_RAM_BASE+1 
+8273 01 ff 07				LD		BC,0x800-1 
+8276 f1					POP		AF 
+8277 77					LD		(HL),A 
+8278 ed b0				LDIR 
+827a 3e 00				LD		A,COLOR_RAM_DISABLE 
+827c d3 08				OUT		(PORT_COLOR_RAM),A 
+827e c9					RET 
+827f			 
+827f			; Helper to load CRTC with register values pointed to by HL 
+827f			setup_crtc: 
+827f 0e 00				LD		C,0 
+8281 06 10				LD		B,16 
+8283			L1: 
+8283 79					LD		A,C 
+8284 d3 0c				OUT		(0CH),A 
+8286 7e					LD		A,(HL) 
+8287 d3 0d				OUT		(0DH),A 
+8289 0c					INC		C 
+828a 23					INC		HL 
+828b 10 f6				DJNZ	L1 
+828d c9					RET 
+828e			 
+828e			is_key_down:   
+828e c5					PUSH    BC 
+828f 4f					LD      C,A 
+8290 47					LD      B,A 
+8291 3e 12				LD      A,12h 
+8293 d3 0c				OUT     (0Ch),A 
+8295 78					LD      A,B 
+8296 0f					RRCA 
+8297 0f					RRCA 
+8298 0f					RRCA 
+8299 0f					RRCA 
+829a e6 03				AND     03h 
+829c d3 0d				OUT     (0Dh),A 
+829e 3e 13				LD      A,13h 
+82a0 d3 0c				OUT     (0Ch),A 
+82a2 78					LD      A,B 
+82a3 07					RLCA 
+82a4 07					RLCA 
+82a5 07					RLCA 
+82a6 07					RLCA 
+82a7 d3 0d				OUT     (0Dh),A 
+82a9 3e 01				LD      A,01h 
+82ab d3 0b				OUT     (0Bh),A 
+82ad 3e 10				LD      A,10h 
+82af d3 0c				OUT     (0Ch),A 
+82b1 db 0d				IN      A,(0Dh) 
+82b3 3e 1f				LD      A,1Fh 
+82b5 d3 0c				OUT     (0Ch),A 
+82b7 d3 0d				OUT     (0Dh),A 
+82b9 db 0c		L095D: 	IN      A,(0Ch) 
+82bb cb 7f				BIT     7,A 
+82bd 28 fa				JR      Z,L095D 
+82bf db 0c				IN      A,(0Ch) 
+82c1 2f					CPL 
+82c2 cb 77				BIT     6,A 
+82c4 3e 00				LD      A,00h 
+82c6 d3 0b				OUT     (0Bh),A 
+82c8 79					LD      A,C 
+82c9 c1					POP     BC 
+82ca c9					RET 
+82cb			 
+82cb			 
+82cb			;; Wait for space key 
+82cb			wait_key: 
+82cb 3e 37			LD		A,KEY_SPACE 
+82cd cd 8e 82			CALL	is_key_down 
+82d0 20 f9			JR		NZ,wait_key 
+82d2			 
+82d2			L_wait2: 
+82d2 3e 37			LD		A,KEY_SPACE 
+82d4 cd 8e 82			CALL	is_key_down 
+82d7 28 f9			JR		Z,L_wait2 
+82d9 c9				RET 
+82da			 
+82da			 
+82da					; print integer in HL to DE 
+82da			prt_int_word: 
+82da 3e 30				LD		A,'0' 
+82dc 32 00 70				LD		(LIB_SCRATCH+0),A 
+82df 01 f0 d8				ld		bc,-10000 
+82e2 cd fb 82				call	Num1 
+82e5 01 18 fc				ld		bc,-1000 
+82e8 cd fb 82				call	Num1 
+82eb 01 9c ff				ld		bc,-100 
+82ee cd fb 82				call	Num1 
+82f1 0e f6				ld		c,-10 
+82f3 cd fb 82				call	Num1 
+82f6 48					ld		c,b 
+82f7 af					XOR		A 
+82f8 32 00 70				LD		(LIB_SCRATCH+0),A 
+82fb			 
+82fb			Num1:		 
+82fb 3e 2f				ld		a,'0'-1 
+82fd			Num2:	 
+82fd 3c					inc		a 
+82fe 09					add		hl,bc 
+82ff 38 fc				jr		c,Num2 
+8301 ed 42				sbc		hl,bc 
+8303			 
+8303 4f					LD		C,A 
+8304 3a 00 70				LD		A,(LIB_SCRATCH+0) 
+8307 b9					cp		C 
+8308 c8					ret		Z 
+8309 79					LD		A,C 
+830a			 
+830a 12					ld		(de),A 
+830b 13					inc		de 
+830c af					XOR		A 
+830d 32 00 70				LD		(LIB_SCRATCH+0),A 
+8310 c9					ret 
+8311			 
+8311					; print hex word in HL to DE 
+8311			prt_hex_word: 
+8311 7c					LD		A,H 
+8312 cd 1a 83				CALL	prt_hex_byte 
+8315 7d					LD		A,L 
+8316 cd 1a 83				CALL	prt_hex_byte 
+8319 c9					ret 
+831a			 
+831a					; print hex byte in A to DE 
+831a			prt_hex_byte: 
+831a f5					PUSH	AF 
+831b cb 3f				SRL		A 
+831d cb 3f				SRL		A 
+831f cb 3f				SRL		A 
+8321 cb 3f				SRL		A 
+8323 cd 27 83				CALL	prt_hex_nib 
+8326 f1					POP		AF 
+8327					;; fall through 
+8327			 
+8327			 
+8327					; print low nibble of A to DE 
+8327			prt_hex_nib: 
+8327 e6 0f				and     0xF 
+8329 fe 0a				cp      0xA 
+832b 38 05				jr      c,lt10 
+832d c6 37				add		'A' - 0xA; 
+832f 12					ld		(de),a 
+8330 13					inc		de 
+8331 c9					ret 
+8332			lt10: 
+8332 c6 30				add		'0' 
+8334 12					ld		(de),a 
+8335 13					inc		de 
+8336 c9					ret; 
+8337			 
+8337			 
+# End of file CommonDefs.asm
+8337			 
+8337			seek 0x9000-0x8000 
+8337 01 02 03 04 05 06		db	0x01,0x02,0x03,0x04,0x05,0x06 
+833d			 
+833d			seek 0xb100-0x8000 
+833d 11 12 13 14 15 16		db	0x11,0x12,0x13,0x14,0x15,0x16
+# End of file MemTestRom.asm
+8343

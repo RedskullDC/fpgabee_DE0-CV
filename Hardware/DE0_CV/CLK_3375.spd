@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simPackage>
+ <file path="CLK_3375_sim/CLK_3375.vho" type="VHDL" />
+ <topLevel name="CLK_3375" />
+ <deviceFamily name="cyclonev" />
+</simPackage>

@@ -1,0 +1,525 @@
+# File HeapTestRom.asm
+0000					ORG			08000h 
+8000			 
+8000			RAM_BASE:			EQU		7000h 
+8000			LIB_SCRATCH:		EQU		RAM_BASE 
+8000			 
+8000			HEAP_FREE_CHAIN:		EQU	100h 
+8000			HEAP_HI_WATER:			EQU	102h 
+8000			HEAP_BASE_ADDRESS:		EQU 200h 
+8000			HEAP_SIZE:				EQU	0x3800 
+8000			 
+8000			P1: EQU		4000h 
+8000			P2: EQU		4002h 
+8000			P3: EQU		4004h 
+8000			P4: EQU		4006h 
+8000			 
+8000			 
+8000 31 00 80			LD		SP,0x8000 
+8003			 
+8003 21 19 81			LD		HL,CRTC_Registers_64_16 
+8006 cd d6 81			CALL	setup_crtc 
+8009			 
+8009 cd 99 81			CALL	clear_screen 
+800c 3e 0b			LD		A,COLOR_YELLOW 
+800e cd bf 81			CALL	clear_color_buffer 
+8011 cd a8 81			CALL	clear_attribute_buffer 
+8014			 
+8014				; Copy letters to RAM (testing) 
+8014 11 00 f0			LD		DE,CHAR_RAM_BASE 
+8017 21 66 80			LD		HL,MSG 
+801a 01 0c 00			LD		BC,MSG_END-MSG 
+801d ed b0			LDIR  
+801f			 
+801f cd 72 80			call	HeapInit 
+8022			 
+8022 01 64 00			ld		BC,100 
+8025 cd 7f 80			call	HeapAlloc 
+8028 22 00 40			ld		(P1),HL 
+802b			 
+802b 01 c8 00			ld		BC,200 
+802e cd 7f 80			call	HeapAlloc 
+8031 22 02 40			ld		(P2),HL 
+8034			 
+8034 01 96 00			ld		BC,150 
+8037 cd 7f 80			call	HeapAlloc 
+803a 22 04 40			ld		(P3),HL 
+803d			 
+803d 01 fa 00			ld		BC,250 
+8040 cd 7f 80			call	HeapAlloc 
+8043 22 06 40			ld		(P4),HL 
+8046			 
+8046 2a 02 40			ld		HL,(P2) 
+8049 cd f2 80			call	HeapFree 
+804c 2a 04 40			ld		HL,(P3) 
+804f cd f2 80			call	HeapFree 
+8052			 
+8052 01 af 00			ld		BC,175 
+8055 cd 7f 80			call	HeapAlloc 
+8058 22 02 40			ld 		(P2),HL 
+805b			 
+805b 01 e1 00			ld		BC,225 
+805e cd 7f 80			call	HeapAlloc 
+8061 22 04 40			ld      (P3),HL 
+8064			 
+8064 18 fe			jr $ 
+8066			 
+8066			MSG: 
+8066 ..				DB	"Heap Testing" 
+8072			MSG_END: 
+8072			 
+8072			 
+8072			include "../PcuBoot/Heap.asm" 
+8072			; This is a _really_ simple heap manager, designed to work well enough for FPGABee's PCU 
+8072			; Note the following: 
+8072			;   - free blocks aren't split for smaller allocations - the first one that's big enough is 
+8072			;      used 
+8072			;   - free blocks aren't coalesced 
+8072			;   - freeing the highest block will drop the hi-water mark. 
+8072			; In other words: 
+8072			;   - try to free blocks in the reverse order they're allocated 
+8072			;   - try to allocate permanent/long living allocations first. 
+8072			 
+8072			; Initialize the heap 
+8072			HeapInit: 
+8072 21 00 00			ld		HL,0 
+8075 22 00 01			ld		(HEAP_FREE_CHAIN),HL 
+8078 21 00 02			ld		HL,HEAP_BASE_ADDRESS 
+807b 22 02 01			ld		(HEAP_HI_WATER),HL 
+807e c9				ret 
+807f			HeapInitEnd: 
+807f			 
+807f			 
+807f			; On entry 
+807f			; 	BC = number of bytes 
+807f			; On return 
+807f			; 	HL = pointer 
+807f			HeapAlloc: 
+807f dd 21 00 00		ld		IX,0 
+8083 dd 39			add		IX,SP 
+8085			 
+8085				; BC must allocate at least 2 bytes 
+8085 3e 00			ld		a,0 
+8087 b0				or		b 
+8088 20 07			jr		nz,ha_big_enough 
+808a 79				ld		a,c 
+808b fe 02			cp		2 
+808d 30 02			jr		nc,ha_big_enough 
+808f 0e 02			ld		c,2 
+8091			ha_big_enough: 
+8091			 
+8091				; Previous chain pointer 
+8091 dd 36 f6 00		ld		(IX-10),0 
+8095 dd 36 f7 00		ld		(IX-9),0 
+8099			 
+8099				; Anything in the free chain? 
+8099 2a 00 01			ld		HL,(HEAP_FREE_CHAIN) 
+809c			 
+809c			heap_alloc_l1: 
+809c 7c				ld		A,H 
+809d b5				or		L 
+809e 28 31			jr		Z,no_free_blocks 
+80a0			 
+80a0				; Get the size of this free block 
+80a0 5e				ld		E,(HL) 
+80a1 23				inc		HL 
+80a2 56				ld		D,(HL) 
+80a3 23				inc		HL 
+80a4			 
+80a4				; Is it big enough? 
+80a4 7b				ld		A,E 
+80a5 91				sub		C 
+80a6 7a				ld		A,D 
+80a7 98				sbc		A,B 
+80a8 30 0d			jr		nc,found_free_block 
+80aa			 
+80aa				; Save previous pointer 
+80aa dd 75 f6			ld		(IX-10),L 
+80ad dd 74 f7			ld		(IX-9),H 
+80b0			 
+80b0				; Follow chain 
+80b0 5e				ld		E,(HL) 
+80b1 23				inc		HL 
+80b2 56				ld		D,(HL) 
+80b3 23				inc		HL 
+80b4 eb				ex		DE,HL 
+80b5 18 e5			jr		heap_alloc_l1 
+80b7			 
+80b7			found_free_block: 
+80b7				; Save pointer to the memory block 
+80b7 e5				push	HL			 
+80b8			 
+80b8				; Unlink this block 
+80b8			 
+80b8				; Get address to next memory block 
+80b8 5e				ld		E,(HL)		 
+80b9 23				inc		HL 
+80ba 56				ld		D,(HL) 
+80bb 23				inc		HL			; DE = pointer to next 
+80bc			 
+80bc				; Get address of previous memory block 
+80bc dd 6e f6			ld		L,(IX-10) 
+80bf dd 66 f7			ld		H,(IX-9) 
+80c2 7d				ld		A,L 
+80c3 b4				or		H 
+80c4 28 05			jr		Z,ffb_1 
+80c6 73				ld		(HL),E 
+80c7 23				inc		HL 
+80c8 72				ld		(HL),D 
+80c9 18 04			jr		ffb_2 
+80cb			 
+80cb			ffb_1: 
+80cb				; Freed block is first in chain, update head pointer 
+80cb eb				ex		DE,HL 
+80cc 22 00 01			ld		(HEAP_FREE_CHAIN),HL 
+80cf			 
+80cf			ffb_2: 
+80cf				; Restore block pointer 
+80cf e1				pop		HL			 
+80d0			 
+80d0				; Split block? 
+80d0			 
+80d0 c9				ret 
+80d1			 
+80d1			no_free_blocks: 
+80d1				; Check have room in heap 
+80d1 2a 02 01			ld		HL,(HEAP_HI_WATER) 
+80d4 09				add		HL,BC 
+80d5 23				inc		HL 
+80d6 23				inc		HL 
+80d7 11 00 3a			ld		DE,HEAP_BASE_ADDRESS + HEAP_SIZE 
+80da			 
+80da				; Compare HL > DE 
+80da 7b				ld		A,E 
+80db 95				sub		L 
+80dc 7a				ld		A,D 
+80dd 9c				sbc		A,H 
+80de 38 0e			jr		c,out_of_memory 
+80e0			 
+80e0				; Have room, adjust hi-water 
+80e0 2a 02 01			ld		HL,(HEAP_HI_WATER) 
+80e3 71				ld		(HL),C 
+80e4 23				inc		HL 
+80e5 70				ld		(HL),B 
+80e6 23				inc		HL 
+80e7 e5				push	HL 
+80e8 09				add		HL,BC 
+80e9 22 02 01			ld		(HEAP_HI_WATER),HL 
+80ec e1				pop		HL 
+80ed c9				ret 
+80ee			 
+80ee			out_of_memory: 
+80ee 21 00 00			ld		HL,0 
+80f1 c9				ret 
+80f2			 
+80f2			HeapAllocEnd: 
+80f2			 
+80f2			; On Entry 
+80f2			; 	HL = pointer 
+80f2			HeapFree: 
+80f2			 
+80f2				; Get the size of the allocated block 
+80f2 2b				dec		HL 
+80f3 46				ld		B,(HL) 
+80f4 2b				dec		HL 
+80f5 4e				ld		C,(HL)		; BC = size of block 
+80f6			 
+80f6				; Is it the highest allocated block? 
+80f6 e5				push	HL 
+80f7 09				add		HL,BC 
+80f8 23				inc		HL 
+80f9 23				inc		HL			; end of allocated block 
+80fa eb				ex		DE,HL		 
+80fb 2a 02 01			ld		HL,(HEAP_HI_WATER) 
+80fe 7a				ld		A,D 
+80ff bc				cp		H 
+8100 20 09			jr		NZ,add_to_free_chain 
+8102 7b				ld		A,E 
+8103 bd				cp		L 
+8104 20 05			jr		NZ,add_to_free_chain 
+8106			 
+8106				; Lower heap hi-water 
+8106 e1				pop		HL 
+8107 22 02 01			ld		(HEAP_HI_WATER),HL 
+810a c9				ret 
+810b			 
+810b			add_to_free_chain: 
+810b e1				pop		HL 
+810c ed 5b 00 01		ld		DE,(HEAP_FREE_CHAIN) 
+8110 22 00 01			ld		(HEAP_FREE_CHAIN),HL 
+8113 23				inc		HL 
+8114 23				inc		HL 
+8115 73				ld		(HL),E 
+8116 23				inc		HL 
+8117 72				ld		(HL),D 
+8118 c9				ret 
+8119			 
+8119			HeapFreeEnd:
+# End of file ../PcuBoot/Heap.asm
+8119			include "CommonDefs.asm"
+8119			COLOR_RAM_BASE:		EQU	0xF800 
+8119			PCG_RAM_BASE:		EQU 0xF800 
+8119			CHAR_RAM_BASE:		EQU 0xF000 
+8119			ATTR_RAM_BASE:		EQU 0F000h 
+8119			 
+8119			COLOR_BLACK:		EQU 0 
+8119			COLOR_DARK_RED:     EQU 1 
+8119			COLOR_DARK_GREEN:   EQU 2 
+8119			COLOR_BROWN:        EQU 3 
+8119			COLOR_DARK_BLUE:    EQU 4 
+8119			COLOR_DARK_MAGENTA: EQU 5 
+8119			COLOR_DARK_CYAN:    EQU 6 
+8119			COLOR_LIGHT_GREY:   EQU 7 
+8119			COLOR_DARK_GREY:    EQU 8 
+8119			COLOR_RED:          EQU 9 
+8119			COLOR_GREEN:        EQU 10 
+8119			COLOR_YELLOW:       EQU 11 
+8119			COLOR_BLUE:         EQU 12 
+8119			COLOR_MAGENTA:      EQU 13 
+8119			COLOR_CYAN:         EQU 14 
+8119			COLOR_WHITE:        EQU 15 
+8119			 
+8119			; Color RAM support 
+8119			PORT_COLOR_RAM:				EQU 08h 
+8119			COLOR_RAM_DISABLE:			EQU 00h 
+8119			COLOR_RAM_ENABLE:			EQU 40h 
+8119			 
+8119			; Video Memory Latch 
+8119			PORT_VIDEO_MEMORY_LATCH:	EQU	1Ch 
+8119			VML_BANK_SELECT_MASK:		EQU 0Fh 
+8119			VML_CHARACTER_RAM_ENABLE:	EQU 00h 
+8119			VML_ATTRIBUTE_RAM_ENABLE:	EQU 10h 
+8119			VML_EXTENDED_GRAPHICS:		EQU 80h 
+8119			 
+8119			; Attributes 
+8119			ATTR_PCG_BANK_SELECT_MASK:	EQU 0Fh 
+8119			 
+8119			KEY_LEFT:     EQU 59 
+8119			KEY_RIGHT:    EQU 62 
+8119			KEY_COMMA:    EQU 44 
+8119			KEY_PERIOD:   EQU 46 
+8119			KEY_SPACE:    EQU 55 
+8119			KEY_ENTER:    EQU 52 
+8119			KEY_1:        EQU 33 
+8119			KEY_2:        EQU 34 
+8119			KEY_ESCAPE:   EQU 48 
+8119			 
+8119			 
+8119			; Various CRTC configurations 
+8119			 
+8119			CRTC_Registers_64_16:   
+8119 6b 40 51 37 12 09 10 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x10,0x12 
+8121 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+8129			 
+8129			CRTC_Registers_64_16_b:   
+8129 6b 40 51 37 12 09 10 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x10,0x12 
+8131 48 0a 2f 0f 20 00 00 00		DB  0x48,0x0A,0x2F,0x0F,0x20,0x00,0x00,0x00 
+8139			 
+8139			CRTC_Registers_64_17:   
+8139 6b 40 51 37 12 09 11 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x11,0x12 
+8141 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+8149			 
+8149			CRTC_Registers_64_18:   
+8149 6b 40 51 37 12 09 12 12		DB	0x6b,0x40,0x51,0x37,0x12,0x09,0x12,0x12 
+8151 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+8159			 
+8159			CRTC_Registers_40_25: 
+8159 35 28 2d 24 1b 05 19 1a		DB	0x35,0x28,0x2D,0x24,0x1B,0x05,0x19,0x1A 
+8161 48 0a 2a 0a 00 00 00 00		DB  0x48,0x0A,0x2A,0x0A,0x00,0x00,0x00,0x00 
+8169			 
+8169			CRTC_Registers_80_16: 
+8169 6b 50 59 37 12 09 10 12		DB	0x6B,0x50,0x59,0x37,0x12,0x09,0x10,0x12 
+8171 48 0f 2f 0f 00 00 00 00		DB  0x48,0x0F,0x2F,0x0F,0x00,0x00,0x00,0x00 
+8179			 
+8179			CRTC_Registers_80_24: 
+8179 6b 50 58 37 1b 05 18 1a		DB	0x6B,0x50,0x58,0x37,0x1B,0x05,0x18,0x1A 
+8181 48 0a 2a 0a 20 00 00 00		DB  0x48,0x0A,0x2A,0x0A,0x20,0x00,0x00,0x00 
+8189			 
+8189			CRTC_Registers_80_25: 
+8189 6b 50 58 37 1b 05 19 1a		DB	0x6B,0x50,0x58,0x37,0x1B,0x05,0x19,0x1A 
+8191 48 0a 09 0a 20 00 00 00		DB  0x48,0x0A,0x09,0x0A,0x20,0x00,0x00,0x00 
+8199			 
+8199			 
+8199			; Clear the screen 
+8199			clear_screen: 
+8199 3e 20				LD		A,' ' 
+819b 21 00 f0				LD		HL,CHAR_RAM_BASE 
+819e 11 01 f0				LD		DE,CHAR_RAM_BASE+1 
+81a1 01 ff 07				LD		BC,0x800-1 
+81a4 77					LD      (HL),A 
+81a5 ed b0				LDIR 
+81a7 c9					RET 
+81a8			 
+81a8			; Clear attribute RAM 
+81a8			clear_attribute_buffer: 
+81a8 3e 10				LD		A,VML_ATTRIBUTE_RAM_ENABLE 
+81aa d3 1c				OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+81ac 3e 00				LD		A,0 
+81ae 21 00 f0				LD		HL,ATTR_RAM_BASE 
+81b1 11 01 f0				LD		DE,ATTR_RAM_BASE+1 
+81b4 01 ff 07				LD		BC,0x800-1 
+81b7 77					LD      (HL),A 
+81b8 ed b0				LDIR 
+81ba 3e 00				LD		A,VML_CHARACTER_RAM_ENABLE 
+81bc d3 1c				OUT		(PORT_VIDEO_MEMORY_LATCH),A 
+81be c9					RET 
+81bf			 
+81bf			; Fill colour buffer with A 
+81bf			clear_color_buffer:	 
+81bf f5					PUSH	AF 
+81c0 3e 40				LD		A, COLOR_RAM_ENABLE 
+81c2 d3 08				OUT     (PORT_COLOR_RAM),A 
+81c4 21 00 f8				LD		HL,COLOR_RAM_BASE 
+81c7 11 01 f8				LD		DE,COLOR_RAM_BASE+1 
+81ca 01 ff 07				LD		BC,0x800-1 
+81cd f1					POP		AF 
+81ce 77					LD		(HL),A 
+81cf ed b0				LDIR 
+81d1 3e 00				LD		A,COLOR_RAM_DISABLE 
+81d3 d3 08				OUT		(PORT_COLOR_RAM),A 
+81d5 c9					RET 
+81d6			 
+81d6			; Helper to load CRTC with register values pointed to by HL 
+81d6			setup_crtc: 
+81d6 0e 00				LD		C,0 
+81d8 06 10				LD		B,16 
+81da			L1: 
+81da 79					LD		A,C 
+81db d3 0c				OUT		(0CH),A 
+81dd 7e					LD		A,(HL) 
+81de d3 0d				OUT		(0DH),A 
+81e0 0c					INC		C 
+81e1 23					INC		HL 
+81e2 10 f6				DJNZ	L1 
+81e4 c9					RET 
+81e5			 
+81e5			is_key_down:   
+81e5 c5					PUSH    BC 
+81e6 4f					LD      C,A 
+81e7 47					LD      B,A 
+81e8 3e 12				LD      A,12h 
+81ea d3 0c				OUT     (0Ch),A 
+81ec 78					LD      A,B 
+81ed 0f					RRCA 
+81ee 0f					RRCA 
+81ef 0f					RRCA 
+81f0 0f					RRCA 
+81f1 e6 03				AND     03h 
+81f3 d3 0d				OUT     (0Dh),A 
+81f5 3e 13				LD      A,13h 
+81f7 d3 0c				OUT     (0Ch),A 
+81f9 78					LD      A,B 
+81fa 07					RLCA 
+81fb 07					RLCA 
+81fc 07					RLCA 
+81fd 07					RLCA 
+81fe d3 0d				OUT     (0Dh),A 
+8200 3e 01				LD      A,01h 
+8202 d3 0b				OUT     (0Bh),A 
+8204 3e 10				LD      A,10h 
+8206 d3 0c				OUT     (0Ch),A 
+8208 db 0d				IN      A,(0Dh) 
+820a 3e 1f				LD      A,1Fh 
+820c d3 0c				OUT     (0Ch),A 
+820e d3 0d				OUT     (0Dh),A 
+8210 db 0c		L095D: 	IN      A,(0Ch) 
+8212 cb 7f				BIT     7,A 
+8214 28 fa				JR      Z,L095D 
+8216 db 0c				IN      A,(0Ch) 
+8218 2f					CPL 
+8219 cb 77				BIT     6,A 
+821b 3e 00				LD      A,00h 
+821d d3 0b				OUT     (0Bh),A 
+821f 79					LD      A,C 
+8220 c1					POP     BC 
+8221 c9					RET 
+8222			 
+8222			 
+8222			;; Wait for space key 
+8222			wait_key: 
+8222 3e 37			LD		A,KEY_SPACE 
+8224 cd e5 81			CALL	is_key_down 
+8227 20 f9			JR		NZ,wait_key 
+8229			 
+8229			L_wait2: 
+8229 3e 37			LD		A,KEY_SPACE 
+822b cd e5 81			CALL	is_key_down 
+822e 28 f9			JR		Z,L_wait2 
+8230 c9				RET 
+8231			 
+8231			 
+8231					; print integer in HL to DE 
+8231			prt_int_word: 
+8231 3e 30				LD		A,'0' 
+8233 32 00 70				LD		(LIB_SCRATCH+0),A 
+8236 01 f0 d8				ld		bc,-10000 
+8239 cd 52 82				call	Num1 
+823c 01 18 fc				ld		bc,-1000 
+823f cd 52 82				call	Num1 
+8242 01 9c ff				ld		bc,-100 
+8245 cd 52 82				call	Num1 
+8248 0e f6				ld		c,-10 
+824a cd 52 82				call	Num1 
+824d 48					ld		c,b 
+824e af					XOR		A 
+824f 32 00 70				LD		(LIB_SCRATCH+0),A 
+8252			 
+8252			Num1:		 
+8252 3e 2f				ld		a,'0'-1 
+8254			Num2:	 
+8254 3c					inc		a 
+8255 09					add		hl,bc 
+8256 38 fc				jr		c,Num2 
+8258 ed 42				sbc		hl,bc 
+825a			 
+825a 4f					LD		C,A 
+825b 3a 00 70				LD		A,(LIB_SCRATCH+0) 
+825e b9					cp		C 
+825f c8					ret		Z 
+8260 79					LD		A,C 
+8261			 
+8261 12					ld		(de),A 
+8262 13					inc		de 
+8263 af					XOR		A 
+8264 32 00 70				LD		(LIB_SCRATCH+0),A 
+8267 c9					ret 
+8268			 
+8268					; print hex word in HL to DE 
+8268			prt_hex_word: 
+8268 7c					LD		A,H 
+8269 cd 71 82				CALL	prt_hex_byte 
+826c 7d					LD		A,L 
+826d cd 71 82				CALL	prt_hex_byte 
+8270 c9					ret 
+8271			 
+8271					; print hex byte in A to DE 
+8271			prt_hex_byte: 
+8271 f5					PUSH	AF 
+8272 cb 3f				SRL		A 
+8274 cb 3f				SRL		A 
+8276 cb 3f				SRL		A 
+8278 cb 3f				SRL		A 
+827a cd 7e 82				CALL	prt_hex_nib 
+827d f1					POP		AF 
+827e					;; fall through 
+827e			 
+827e			 
+827e					; print low nibble of A to DE 
+827e			prt_hex_nib: 
+827e e6 0f				and     0xF 
+8280 fe 0a				cp      0xA 
+8282 38 05				jr      c,lt10 
+8284 c6 37				add		'A' - 0xA; 
+8286 12					ld		(de),a 
+8287 13					inc		de 
+8288 c9					ret 
+8289			lt10: 
+8289 c6 30				add		'0' 
+828b 12					ld		(de),a 
+828c 13					inc		de 
+828d c9					ret; 
+828e			 
+828e			 
+# End of file CommonDefs.asm
+# End of file HeapTestRom.asm
+828e

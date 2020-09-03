@@ -1,0 +1,7 @@
+*.ncb
+Debug
+Release
+*.user
+test
+*.pdb
+*.suo

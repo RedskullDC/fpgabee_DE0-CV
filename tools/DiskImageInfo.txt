@@ -1,0 +1,26 @@
+
+          Tracks    Heads     Secs/Trk  SecSize   DataTrack DataSec   SysSec
+DS40      40        2         10        512       1         1         1
+SS80      80        1         10        512       1         1         1
+DS80      80        2         10        512       2         21        1
+DS82      80        2         10        512       1         1         1
+DS84      80        2         10        512       1         1         1
+DS8B      80        2         10        512       2         1         1
+HD0       306       4         17        512       1         1         1
+HD1       80        4         63        512       1         1         1
+
+		9 Bit				 6 Bit
+
+
+
+if (track) >= DataTrack
+     ActualSector = (sector) - DataSec
+else
+     ActualSector = (sector) - SysSec
+
+if (ActualSector<0 || ActualSector>=Secs/Trk)
+     then disk read error
+
+TrackClustor = (track) * Heads * Secs/Trk  +  (head) * Secs/Track  + ActualSector
+                201       4      17              3       17              12
+

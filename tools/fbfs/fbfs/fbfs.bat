@@ -1,0 +1,1 @@
+..\Debug\fbfs.exe %*

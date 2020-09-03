@@ -1,0 +1,94 @@
+##############################
+# Clock Nets
+##############################
+
+NET clock      LOC = A9;    # 12 MHz clock input.
+NET "clock" TNM_NET = "clock";
+TIMESPEC "TSclock" = PERIOD "clock" 12 MHz HIGH 50%;
+NET "clock" CLOCK_DEDICATED_ROUTE = FALSE;
+
+TIMESPEC TS_XDOMAINS_Z80TOVIDEO = FROM "clock_54_000" TO "clock_40_000" TIG;
+TIMESPEC TS_XDOMAINS_Z80TO100 = FROM "clock_54_000" TO "clock_100_000" TIG;
+TIMESPEC TS_XDOMAINS_100TO40 = FROM "clock_100_000" TO "clock_40_000" TIG;
+
+
+# PMod4
+                    #Spartan6       # PMod XuLA-PMod4
+NET vgaRed<0>       LOC = H2;       # AIO3 CH23
+NET vgaRed<1>       LOC = M16;      # BIO2 CH4
+NET vgaGreen<0>     LOC = K15;      # BIO4 CH5
+NET vgaGreen<1>     LOC = K16;      # AIO2 CH6
+NET vgaBlue<0>      LOC = J16;      # AIO4 CH7
+NET vgaBlue<1>      LOC = J4;       # BIO3 CH21 
+NET vgaVSync        LOC = H1;       # AIO1 CH22
+NET vgaHSync        LOC = K3;       # BIO1 CH20
+
+# PS2 in PMod6
+NET PS2KeyboardData     loc = J14;  # BIO1 ch8  
+NET PS2KeyboardClock    loc = F2;   # BIO2 ch25
+
+##############################
+# SDRAM
+##############################
+NET sdCke_o        LOC = J12;
+NET sdClk_o        LOC = K12;
+NET sdClkFb_i      LOC = K11;
+NET sdCe_bo        LOC = H4;
+NET sdRas_bo       LOC = L4;
+NET sdCas_bo       LOC = L3;
+NET sdWe_bo        LOC = M3;
+NET sdDqml_o       LOC = M4;
+NET sdDqmh_o       LOC = L13;
+NET sdBs_o<0>      LOC = H3;
+NET sdBs_o<1>      LOC = G3;
+NET sdAddr_o<0>    LOC = E4;
+NET sdAddr_o<1>    LOC = E3;
+NET sdAddr_o<2>    LOC = D3;
+NET sdAddr_o<3>    LOC = C3;
+NET sdAddr_o<4>    LOC = B12;
+NET sdAddr_o<5>    LOC = A12;
+NET sdAddr_o<6>    LOC = D12;
+NET sdAddr_o<7>    LOC = E12;
+NET sdAddr_o<8>    LOC = G16;
+NET sdAddr_o<9>    LOC = G12;
+NET sdAddr_o<10>   LOC = F4;
+NET sdAddr_o<11>   LOC = G11;
+NET sdAddr_o<12>   LOC = H13;
+NET sdData_io<0>   LOC = P6;
+NET sdData_io<1>   LOC = T6;
+NET sdData_io<2>   LOC = T5;
+NET sdData_io<3>   LOC = P5;
+NET sdData_io<4>   LOC = R5;
+NET sdData_io<5>   LOC = N5;
+NET sdData_io<6>   LOC = P4;
+NET sdData_io<7>   LOC = N4;
+NET sdData_io<8>   LOC = P12;
+NET sdData_io<9>   LOC = R12;
+NET sdData_io<10>  LOC = T13;
+NET sdData_io<11>  LOC = T14;
+NET sdData_io<12>  LOC = R14;
+NET sdData_io<13>  LOC = T15;
+NET sdData_io<14>  LOC = T12;
+NET sdData_io<15>  LOC = P11;
+
+##############################
+# I/O Drive
+##############################
+
+NET clock			IOSTANDARD = LVTTL;
+NET PS2*			IOSTANDARD = LVTTL;
+NET vga*			IOSTANDARD = LVTTL;
+NET sdClk_o         IOSTANDARD = LVTTL | SLEW=FAST | DRIVE=8;
+NET sdClkFb_i       IOSTANDARD = LVTTL;
+net sdCke_o         IOSTANDARD = LVTTL;
+net sdCe_bo         IOSTANDARD = LVTTL;
+NET sdAddr_o*       IOSTANDARD = LVTTL | SLEW=SLOW | DRIVE=6;
+NET sdBs_o*         IOSTANDARD = LVTTL | SLEW=SLOW | DRIVE=6;
+NET sdRas_bo        IOSTANDARD = LVTTL | SLEW=SLOW | DRIVE=6;
+NET sdCas_bo        IOSTANDARD = LVTTL | SLEW=SLOW | DRIVE=6;
+NET sdWe_bo         IOSTANDARD = LVTTL | SLEW=SLOW | DRIVE=6;
+NET sdData_io*      IOSTANDARD = LVTTL | SLEW=SLOW | DRIVE=6;
+NET sdDqmh_o        IOSTANDARD = LVTTL | SLEW=SLOW | DRIVE=6;
+NET sdDqml_o        IOSTANDARD = LVTTL | SLEW=SLOW | DRIVE=6;
+
+
